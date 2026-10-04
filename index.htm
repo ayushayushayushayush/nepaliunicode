@@ -188,6 +188,7 @@ function convertCore(text){
   s = s.split("-").join("\u2013");        // hyphen -> en dash
   s = s.split("(").join("-");             // ( -> -   (must stay after the hyphen line)
   s = s.split(")").join("_");             // ) -> _
+  s = s.split(".").join("=");             // . -> =   (must stay before the table, which outputs "." for the danda)
   s = s.split("\u2019").join("\u00da");    // closing quote -> Ú
 
   // move the short-i matra in front of its consonant cluster
