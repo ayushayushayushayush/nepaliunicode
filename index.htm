@@ -1,1 +1,357 @@
-unicode
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unicode to Preeti Converter</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#ffffff; --text:#1d2330; --muted:#667085; --line:#d9dde5;
+    --accent:#2457d6; --accent-text:#ffffff; --ok:#1a7f4b; --warn:#b54708;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14171d; --card:#1d222b; --text:#e8ebf1; --muted:#9aa4b5; --line:#343b48;
+      --accent:#6b93ff; --accent-text:#0d1220; --ok:#4cc58a; --warn:#f0a35e;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Devanagari","Nirmala UI",sans-serif;
+    padding:24px 16px 48px;
+  }
+  .wrap{max-width:1100px;margin:0 auto}
+  h1{font-size:1.5rem;margin:0 0 4px}
+  p.sub{margin:0 0 20px;color:var(--muted)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media (max-width:760px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+  .card h2{font-size:.95rem;margin:0;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+  textarea{
+    width:100%;min-height:340px;resize:vertical;padding:12px;border:1px solid var(--line);border-radius:8px;
+    background:transparent;color:var(--text);font-size:1.15rem;line-height:1.6;
+  }
+  #input{font-family:"Noto Sans Devanagari","Nirmala UI","Mangal",system-ui,sans-serif}
+  #output{font-family:Preeti,"Preeti Normal",monospace}
+  textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  button,label.btn{
+    font:inherit;font-size:.92rem;padding:8px 14px;border-radius:8px;border:1px solid var(--line);
+    background:var(--card);color:var(--text);cursor:pointer;
+  }
+  button:hover,label.btn:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);color:var(--accent-text);border-color:var(--accent);font-weight:600}
+  input[type=file]{display:none}
+  .status{font-size:.85rem;color:var(--muted);min-height:1.3em}
+  .bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;visibility:hidden}
+  .bar.on{visibility:visible}
+  .bar>div{height:100%;width:0;background:var(--accent);transition:width .08s linear}
+  .note{margin-top:16px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--card);font-size:.9rem;color:var(--muted)}
+  .note b{color:var(--text)}
+  .note ol{margin:6px 0 0 18px;padding:0}
+  footer{margin-top:18px;font-size:.8rem;color:var(--muted)}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Unicode → Preeti Converter</h1>
+  <p class="sub">Type or paste Nepali Unicode text on the left. The Preeti text appears on the right. Everything runs in your browser; nothing is uploaded.</p>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Nepali Unicode</h2>
+      <textarea id="input" placeholder="यहाँ नेपाली युनिकोड टेक्स्ट टाइप वा पेस्ट गर्नुहोस्..." spellcheck="false"></textarea>
+      <div class="row">
+        <label class="btn" for="file">Open .txt file</label>
+        <input type="file" id="file" accept=".txt,text/plain">
+        <button id="sample" type="button">Sample</button>
+        <button id="clear" type="button">Clear</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Preeti</h2>
+      <textarea id="output" readonly spellcheck="false" placeholder="Preeti text appears here"></textarea>
+      <div class="row">
+        <button id="copy" class="primary" type="button">Copy</button>
+        <button id="download" type="button">Download .txt</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="bar" id="bar"><div id="barfill"></div></div>
+  <div class="status" id="status"></div>
+
+  <div class="note">
+    <b>How to use the result</b>
+    <ol>
+      <li>Click <b>Copy</b> (or <b>Download .txt</b>), then paste or open it in Word, PowerPoint, Photoshop, etc.</li>
+      <li>Select the text and set the font to <b>Preeti</b>.</li>
+    </ol>
+    <p style="margin:8px 0 0">Preeti text looks like gibberish (e.g. <code>g]kfn</code>) in any normal font. That is expected. The right-hand box only shows real Nepali if the Preeti font is installed on your computer. Keep downloaded files as UTF-8.</p>
+  </div>
+
+  <footer>Conversion rules based on the converter at ashesh.com.np/unicode-preeti, with extra fixes for half letters, word-final halant, reph placement, chandrabindu and several conjuncts.</footer>
+</div>
+
+<script>
+// ==== CORE ====
+const ARRAY_ONE = ["‘", "?", "क़", "ख़", "ग़", "ज़", "ड़", "ढ़", "फ़", "ॐ", "ऽ", "।", "m'", "m]", "mfF", "mF", "०", "१", "२", "३", "४", "५", "६", "७", "८", "९", "फ्र", "झ", "फ", "क्त", "क्र", "ल", "ज्ञ्", "द्घ", "ज्ञ", "द्द", "द्ध", "श्र", "रु", "द्य", "क्ष्", "क्ष", "त्त", "द्म", "त्र", "ध्र", "ङ्घ", "ड्ड", "द्र", "ट्ट", "ड्ढ", "ठ्ठ", "रू", "हृ", "ङ्ग", "त्र", "ङ्क", "ङ्ख", "ट्ठ", "द्व", "ट्र", "ठ्र", "ड्र", "ढ्र", "्र", "ड़", "ढ़", "क्", "क", "ख्", "ख", "ग्", "ग", "घ्", "घ", "ङ", "च्", "च", "छ", "ज्", "ज", "झ्", "झ", "ञ्", "ञ", "ट", "ठ", "ड", "ढ", "ण्", "ण", "त्", "त", "थ्", "थ", "द", "ध्", "ध", "न्", "न", "प्", "प", "फ्", "ब्", "ब", "भ्", "भ", "म्", "म", "य", "र", "ल्", "ल", "व्", "व", "श्", "श", "ष्", "ष", "स्", "स", "ह्", "ह", "्य", "ऑ", "ऑ", "औ", "ओ", "आ", "अ", "ई", "इ", "ऊ", "उ", "ऋ", "ऐ", "ए", "ॉ", "ू", "ु", "ं", "ा", "ृ", "्", "े", "ै", "ँ", "ी", "ः", "ो", "ौ"];
+const ARRAY_TWO = ["…", "<", "क़", "ख़", "ग़", "ज़", "ड़", "ढ़", "फ़", "ç", "˜", ".", "'m", "]m", "Fmf", "Fm", ")", "!", "@", "#", "$", "%", "^", "&", "*", "(", "k|m", "em", "km", "St", "qm", "n", "¡", "b\\3", "1", "2", "4", ">", "?", "B", "I", "If", "Q", "ß", "q", "„", "‹", "•", "ı", "§", "°", "¶", "¿", "X", "Ë", "Ì", "Í", "Î", "\uf002", "å", "6«", "7«", "8«", "9«", "|", "8Þ", "9Þ", "S", "s", "V", "v", "U", "u", "£", "3", "ª", "R", "r", "5", "H", "h", "‰", "´", "~", "`", "6", "7", "8", "9", "0", "0f", "T", "t", "Y", "y", "b", "W", "w", "G", "g", "K", "k", "Ï", "A", "a", "E", "e", "D", "d", "o", "/", "N", "n", "J", "j", "Z", "z", "i", "if", ":", ";", "X", "x", "Ø", "cf‘", "c‘f", "cf}", "cf]", "cf", "c", "O{", "O", "pm", "p", "C", "P]", "P", "f‘", "\"", "'", "+", "f", "[", "\\", "]", "}", "“", "L", "M", "f]", "f}"];
+const MATRAS = "ािीुूृेैोौं:ँॅ";
+const AFTER_MATRAS = "ािीुूृेैोौंःँॅॉ";
+const HALANT = "\u094d";
+const REPH = "\u0930\u094d";
+const CONS = "\u0915-\u0939\u0958-\u095f";
+
+function isConsonant(ch){
+  return ch !== "" && ((ch >= "\u0915" && ch <= "\u0939") || (ch >= "\u0958" && ch <= "\u095f"));
+}
+function charAt(s, i){ return (i >= 0 && i < s.length) ? s[i] : ""; }
+function isMatra(ch){ return ch === "" || MATRAS.indexOf(ch) !== -1; }
+function replaceFirst(s, a, b){
+  const i = s.indexOf(a);
+  return i < 0 ? s : s.slice(0, i) + b + s.slice(i + a.length);
+}
+
+const FINAL_HALANT = new RegExp("([" + CONS + "])\u094d(?![" + CONS + "])", "g");
+const TTA_HALF = new RegExp("\u0924\u094d\u0924\u094d(?=[" + CONS + "])", "g");
+function glyphFor(key){ return ARRAY_TWO[ARRAY_ONE.indexOf(key)]; }
+const HALF_FIRST = [
+  [/\u0932\u094d/g, glyphFor("\u0932\u094d")],           // ल्
+  [/\u092b\u094d(?!\u0930)/g, glyphFor("\u092b\u094d")], // फ् (not फ्र)
+  [/\u091d\u094d/g, glyphFor("\u091d\u094d")]            // झ्
+];
+const M_MATRA = /(km|em|qm)(['"\]}]+)/g;
+const PAIRS = [];
+for (let i = 0; i < ARRAY_ONE.length; i++){
+  const a = ARRAY_ONE[i], b = ARRAY_TWO[i];
+  if (a === "" || a === b) continue;
+  PAIRS.push([a, b]);
+}
+
+function convertCore(text){
+  if (text === "") return text;
+  let s = text;
+
+  // move the short-i matra in front of its consonant cluster
+  let pos = s.indexOf("\u093f");
+  let guard = 0;
+  while (pos !== -1 && guard < 100000){
+    guard++;
+    const left = charAt(s, pos - 1);
+    s = replaceFirst(s, left + "\u093f", "l" + left);
+    pos -= 1;
+    while (charAt(s, pos - 1) === HALANT && pos !== 0){
+      const chunk = charAt(s, pos - 2) + HALANT;
+      s = replaceFirst(s, chunk + "l", "l" + chunk);
+      pos -= 2;
+    }
+    pos = s.indexOf("\u093f");
+  }
+
+  // chandrabindu goes before the u / uu sign
+  s = s.split("\u0941\u0901").join("\u0901\u0941").split("\u0942\u0901").join("\u0901\u0942");
+
+  // reph: move it to the end of its syllable
+  s += "  ";
+  let start = 0;
+  let halfR = s.indexOf(REPH, start);
+  guard = 0;
+  while (halfR !== -1 && guard < 100000){
+    guard++;
+    let z = halfR + 2;
+    let ch = charAt(s, z);
+    while ((isMatra(ch) || ch === "l") && z < s.length){
+      z++;
+      ch = charAt(s, z);
+    }
+    if (!isConsonant(ch)){
+      start = halfR + 2;
+      halfR = s.indexOf(REPH, start);
+      continue;
+    }
+    let right = z + 1;
+    let rightCh = charAt(s, right);
+    while (rightCh === HALANT){
+      z = right + 1;
+      right = z + 1;
+      rightCh = charAt(s, right);
+    }
+    let end = z;
+    while (charAt(s, end + 1) !== "" && AFTER_MATRAS.indexOf(charAt(s, end + 1)) !== -1) end++;
+    const chunk = s.slice(halfR + 2, end + 1);
+    s = s.slice(0, halfR) + chunk + "{" + s.slice(end + 1);
+    start = halfR;
+    halfR = s.indexOf(REPH, start);
+  }
+  s = s.slice(0, -2);
+
+  // second-round fixes (before the big table)
+  s = s.replace(TTA_HALF, () => "\u0152");
+  s = s.replace(FINAL_HALANT, (m, g) => g + "\\");
+  for (const [rx, glyph] of HALF_FIRST) s = s.replace(rx, () => glyph);
+  s = s.split("\u0919\u094d\u0916\u094d").join("\u00aa\\V");
+
+  // table replacement, in order
+  for (const [a, b] of PAIRS){
+    let g = 0;
+    while (s.indexOf(a) !== -1 && g < 50){
+      g++;
+      s = s.split(a).join(b);
+    }
+  }
+  s = s.replace(M_MATRA, (m, a, b) => a[0] + b + "m");
+  return s;
+}
+
+// speed-ups for big texts: words are converted once and remembered
+const SENTINEL = "\u0000";
+const PIECE = 40;
+const cache = new Map();
+
+function convertPiece(piece){
+  let hit = cache.get(piece);
+  if (hit === undefined){
+    hit = replaceFirst(convertCore(SENTINEL + piece), SENTINEL, "");
+    cache.set(piece, hit);
+  }
+  return hit;
+}
+function cutPoints(word){
+  const cuts = [];
+  for (let i = 0; i < word.length; i++){
+    const c = word[i];
+    if (((c >= "\u0904" && c <= "\u0939") || (c >= "\u0958" && c <= "\u095f")) &&
+        !(i > 0 && "\u094d\u200c\u200d".indexOf(word[i - 1]) !== -1)) cuts.push(i);
+  }
+  return cuts;
+}
+function convertWord(word){
+  const hit = cache.get(word);
+  if (hit !== undefined) return hit;
+  if (word.length <= PIECE * 2) return convertPiece(word);
+  const out = [];
+  let start = 0;
+  for (const c of cutPoints(word)){
+    if (c - start >= PIECE){
+      out.push(convertPiece(word.slice(start, c)));
+      start = c;
+    }
+  }
+  out.push(convertPiece(word.slice(start)));
+  return out.join("");
+}
+function convertSync(text){
+  const out = [];
+  for (const tok of text.split(/(\s+)/)){
+    if (tok === "") continue;
+    out.push(/^\s+$/.test(tok) ? tok : convertWord(tok));
+  }
+  return out.join("");
+}
+// ==== END CORE ====
+
+// ---------------------------- interface ---------------------------------
+const $ = id => document.getElementById(id);
+const inputEl = $("input"), outputEl = $("output"), statusEl = $("status");
+const bar = $("bar"), barfill = $("barfill");
+let runId = 0, timer = null, fileName = "preeti";
+
+async function convertAsync(text, myRun){
+  const toks = text.split(/(\s+)/);
+  const out = [];
+  const total = text.length;
+  let done = 0, last = performance.now();
+  for (let n = 0; n < toks.length; n++){
+    const tok = toks[n];
+    if (tok === "") continue;
+    out.push(/^\s+$/.test(tok) ? tok : convertWord(tok));
+    done += tok.length;
+    if ((n & 255) === 0){
+      const now = performance.now();
+      if (now - last >= 40){
+        barfill.style.width = (100 * done / total).toFixed(1) + "%";
+        await new Promise(r => setTimeout(r, 0));
+        if (myRun !== runId) return null;       // newer input arrived
+        last = performance.now();
+      }
+    }
+  }
+  return out.join("");
+}
+
+async function run(){
+  const myRun = ++runId;
+  const text = inputEl.value;
+  if (text === ""){
+    outputEl.value = "";
+    statusEl.textContent = "";
+    bar.classList.remove("on");
+    return;
+  }
+  const t0 = performance.now();
+  const big = text.length > 20000;
+  if (big){ bar.classList.add("on"); barfill.style.width = "0%"; statusEl.textContent = "Converting..."; }
+  const result = await convertAsync(text, myRun);
+  if (result === null || myRun !== runId) return;
+  outputEl.value = result;
+  barfill.style.width = "100%";
+  setTimeout(() => { if (myRun === runId) bar.classList.remove("on"); }, 300);
+  const words = (text.match(/\S+/g) || []).length;
+  statusEl.textContent = words.toLocaleString() + " words converted in " + ((performance.now() - t0) / 1000).toFixed(2) + " s";
+}
+function schedule(){ clearTimeout(timer); timer = setTimeout(run, 200); }
+
+inputEl.addEventListener("input", schedule);
+
+$("clear").addEventListener("click", () => { inputEl.value = ""; fileName = "preeti"; run(); inputEl.focus(); });
+$("sample").addEventListener("click", () => {
+  inputEl.value = "नेपालको केन्द्रीय बैंकले आफ्नो नीति घोषणा गर्‍यो ।\nजनसङ्ख्याले महत्त्वपूर्ण भूमिका खेल्छ। उद्घाटन भक्तका हृदयका कट्ठा।";
+  run();
+});
+
+$("file").addEventListener("change", async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  fileName = f.name.replace(/\.[^.]+$/, "");
+  const buf = await f.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let enc = "utf-8";
+  if (bytes[0] === 0xFF && bytes[1] === 0xFE) enc = "utf-16le";
+  else if (bytes[0] === 0xFE && bytes[1] === 0xFF) enc = "utf-16be";
+  inputEl.value = new TextDecoder(enc).decode(buf);   // strips a UTF-8 BOM
+  e.target.value = "";
+  run();
+});
+
+$("copy").addEventListener("click", async () => {
+  const t = outputEl.value;
+  if (!t) return;
+  try {
+    await navigator.clipboard.writeText(t);
+  } catch (err) {
+    outputEl.focus(); outputEl.select(); document.execCommand("copy");
+  }
+  const b = $("copy"), old = b.textContent;
+  b.textContent = "Copied!";
+  setTimeout(() => { b.textContent = old; }, 1200);
+});
+
+$("download").addEventListener("click", () => {
+  const t = outputEl.value;
+  if (!t) return;
+  const blob = new Blob([t], { type: "text/plain;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = fileName + "_preeti.txt";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+});
+</script>
+</body>
+</html>
