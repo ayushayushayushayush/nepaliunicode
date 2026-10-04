@@ -48,6 +48,9 @@
   .seg label:has(input:checked){background:color-mix(in srgb, var(--accent) 14%, transparent)}
   .seg label + label{border-left:1px solid var(--line)}
   .head{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+  .sizebtns{display:inline-flex;align-items:center;gap:4px}
+  .sizebtns button{padding:4px 10px;font-weight:700;line-height:1.2}
+  .sizebtns span{font-size:.8rem;color:var(--muted);min-width:2.6em;text-align:center}
   .fontwarn{font-size:.82rem;color:var(--warn);min-height:1.2em}
   textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
   .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -92,6 +95,11 @@
         <div class="seg" role="radiogroup" aria-label="Preview font">
           <label title="Uses the Preeti font if it is installed on your computer"><input type="radio" name="pf" value="current" checked><span>Current look</span></label>
           <label title="Uses Kantipur Regular.ttf from this website"><input type="radio" name="pf" value="kantipur"><span>Kantipur font</span></label>
+        </div>
+        <div class="sizebtns" aria-label="Preview font size">
+          <button id="smaller" type="button" title="Decrease font size">A&minus;</button>
+          <span id="sizeval">18px</span>
+          <button id="bigger" type="button" title="Increase font size">A+</button>
         </div>
       </div>
       <textarea id="output" data-font="current" readonly spellcheck="false" placeholder="Preeti text appears here"></textarea>
@@ -157,6 +165,11 @@ for (let i = 0; i < ARRAY_ONE.length; i++){
 function convertCore(text){
   if (text === "") return text;
   let s = text;
+
+  // punctuation (before the table, which itself outputs "/")
+  s = s.split("/").join("\u00f7");        // / -> ÷
+  s = s.split("-").join("\u2013");        // hyphen -> en dash
+  s = s.split("\u2019").join("\u00da");    // closing quote -> Ú
 
   // move the short-i matra in front of its consonant cluster
   let pos = s.indexOf("\u093f");
@@ -266,7 +279,13 @@ function convertWord(word){
   out.push(convertPiece(word.slice(start)));
   return out.join("");
 }
+// straight single quotes: opening after start / space / bracket / dash, else closing
+const OPEN_Q = /(^|[\s(\[{<"\u201c\u2018\u2013\u2014\/-])'/gm;
+function preprocess(text){
+  return text.replace(OPEN_Q, (m, g) => g + "\u2018").split("'").join("\u2019");
+}
 function convertSync(text){
+  text = preprocess(text);
   const out = [];
   for (const tok of text.split(/(\s+)/)){
     if (tok === "") continue;
@@ -283,7 +302,7 @@ const bar = $("bar"), barfill = $("barfill");
 let runId = 0, timer = null, fileName = "preeti";
 
 async function convertAsync(text, myRun){
-  const toks = text.split(/(\s+)/);
+  const toks = preprocess(text).split(/(\s+)/);
   const out = [];
   const total = text.length;
   let done = 0, last = performance.now();
@@ -329,6 +348,18 @@ function schedule(){ clearTimeout(timer); timer = setTimeout(run, 200); }
 
 inputEl.addEventListener("input", schedule);
 
+// ---- preview font size (output box only) ----
+let outSize = 18;
+try{ const v = parseInt(localStorage.getItem("previewSize"), 10); if (v >= 10 && v <= 72) outSize = v; }catch(err){}
+function applySize(){
+  outputEl.style.fontSize = outSize + "px";
+  $("sizeval").textContent = outSize + "px";
+  try{ localStorage.setItem("previewSize", String(outSize)); }catch(err){}
+}
+$("smaller").addEventListener("click", () => { if (outSize > 10){ outSize -= 2; applySize(); } });
+$("bigger").addEventListener("click", () => { if (outSize < 72){ outSize += 2; applySize(); } });
+applySize();
+
 // ---- preview font switch: "current" (installed Preeti) or bundled Kantipur ----
 async function kantipurLoaded(){
   try{
@@ -359,7 +390,7 @@ document.querySelectorAll('input[name="pf"]').forEach(r => {
 
 $("clear").addEventListener("click", () => { inputEl.value = ""; fileName = "preeti"; run(); inputEl.focus(); });
 $("sample").addEventListener("click", () => {
-  inputEl.value = "नेपालको केन्द्रीय बैंकले आफ्नो नीति घोषणा गर्‍यो ।\nजनसङ्ख्याले महत्त्वपूर्ण भूमिका खेल्छ। उद्घाटन भक्तका हृदयका कट्ठा।";
+  inputEl.value = "नेपालको केन्द्रीय बैंकले आफ्नो नीति घोषणा गर्‍यो ।\nजनसङ्ख्याले महत्त्वपूर्ण भूमिका खेल्छ। उद्घाटन भक्तका हृदयका कट्ठा।\n'राष्ट्रवाद'को, 'गोरा', थाकेको/गलेको - २०८०/८१";
   run();
 });
 
