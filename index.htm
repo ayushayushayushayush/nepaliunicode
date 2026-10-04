@@ -34,6 +34,19 @@
     background:transparent;color:var(--text);font-size:1.15rem;line-height:1.6;
   }
   #input{font-family:"Noto Sans Devanagari","Nirmala UI","Mangal",system-ui,sans-serif}
+
+  /* highlight backdrop behind the Unicode input */
+  .hl{position:relative;display:flex}
+  .hl textarea{position:relative;z-index:1;background:transparent;flex:1;display:block;overflow-y:scroll}
+  #backdrop{
+    position:absolute;inset:0;margin:0;padding:12px;border:1px solid transparent;border-radius:8px;
+    white-space:pre-wrap;overflow-wrap:break-word;overflow-y:scroll;pointer-events:none;
+    color:transparent;font-size:1.15rem;line-height:1.6;
+    font-family:"Noto Sans Devanagari","Nirmala UI","Mangal",system-ui,sans-serif;
+    scrollbar-color:transparent transparent;
+  }
+  #backdrop mark{color:transparent;background:color-mix(in srgb, var(--accent) 35%, transparent);border-radius:3px}
+
   @font-face{
     font-family:"KantipurWeb";
     src:url("Kantipur%20Regular.ttf") format("truetype");
@@ -80,7 +93,10 @@
   <div class="grid">
     <div class="card">
       <h2>Nepali Unicode</h2>
-      <textarea id="input" placeholder="यहाँ नेपाली युनिकोड टेक्स्ट टाइप वा पेस्ट गर्नुहोस्..." spellcheck="false"></textarea>
+      <div class="hl">
+        <div id="backdrop" aria-hidden="true"></div>
+        <textarea id="input" placeholder="यहाँ नेपाली युनिकोड टेक्स्ट टाइप वा पेस्ट गर्नुहोस्..." spellcheck="false"></textarea>
+      </div>
       <div class="row">
         <label class="btn" for="file">Open .txt file</label>
         <input type="file" id="file" accept=".txt,text/plain">
@@ -121,9 +137,10 @@
       <li>Select the text and set the font to <b>Preeti</b>.</li>
     </ol>
     <p style="margin:8px 0 0">Preeti text looks like gibberish (e.g. <code>g]kfn</code>) in any normal font. That is expected. The right-hand box only shows real Nepali if the Preeti font is installed on your computer, or if you switch the preview to <b>Kantipur font</b>, which this page loads itself. The switch changes only how the preview looks; the copied and downloaded text is the same either way. Keep downloaded files as UTF-8.</p>
+    <p style="margin:8px 0 0">Tip: select a word in the Preeti box and the matching word is highlighted in the Unicode box.</p>
   </div>
 
-  <footer>Conversion rules based on the converter at ashesh.com.np/unicode-preeti, with extra fixes for half letters, word-final halant, reph placement, chandrabindu and several conjuncts.</footer>
+  <footer>Conversion rules based on the converter at ashesh.com.np/unicode-preeti, with extra fixes for half letters, word-final halant, reph placement, chandrabindu, brackets and several conjuncts.</footer>
 </div>
 
 <script>
@@ -166,9 +183,11 @@ function convertCore(text){
   if (text === "") return text;
   let s = text;
 
-  // punctuation (before the table, which itself outputs "/")
+  // punctuation (before the table, which itself outputs "/", "(" and ")")
   s = s.split("/").join("\u00f7");        // / -> ÷
   s = s.split("-").join("\u2013");        // hyphen -> en dash
+  s = s.split("(").join("-");             // ( -> -   (must stay after the hyphen line)
+  s = s.split(")").join("_");             // ) -> _
   s = s.split("\u2019").join("\u00da");    // closing quote -> Ú
 
   // move the short-i matra in front of its consonant cluster
@@ -284,15 +303,6 @@ const OPEN_Q = /(^|[\s(\[{<"\u201c\u2018\u2013\u2014\/-])'/gm;
 function preprocess(text){
   return text.replace(OPEN_Q, (m, g) => g + "\u2018").split("'").join("\u2019");
 }
-function convertSync(text){
-  text = preprocess(text);
-  const out = [];
-  for (const tok of text.split(/(\s+)/)){
-    if (tok === "") continue;
-    out.push(/^\s+$/.test(tok) ? tok : convertWord(tok));
-  }
-  return out.join("");
-}
 // ==== END CORE ====
 
 // ---------------------------- interface ---------------------------------
@@ -300,16 +310,26 @@ const $ = id => document.getElementById(id);
 const inputEl = $("input"), outputEl = $("output"), statusEl = $("status");
 const bar = $("bar"), barfill = $("barfill");
 let runId = 0, timer = null, fileName = "preeti";
+let tokMap = [];   // [inStart, inEnd, outStart, outEnd] for each word
 
+// preprocess() only swaps one character for one character, so positions in the
+// preprocessed text match positions in the original input.
 async function convertAsync(text, myRun){
   const toks = preprocess(text).split(/(\s+)/);
-  const out = [];
+  const out = [], map = [];
+  let inPos = 0, outPos = 0;
   const total = text.length;
   let done = 0, last = performance.now();
   for (let n = 0; n < toks.length; n++){
     const tok = toks[n];
     if (tok === "") continue;
-    out.push(/^\s+$/.test(tok) ? tok : convertWord(tok));
+    if (/^\s+$/.test(tok)){
+      out.push(tok); inPos += tok.length; outPos += tok.length;
+    } else {
+      const c = convertWord(tok);
+      map.push([inPos, inPos + tok.length, outPos, outPos + c.length]);
+      out.push(c); inPos += tok.length; outPos += c.length;
+    }
     done += tok.length;
     if ((n & 255) === 0){
       const now = performance.now();
@@ -321,14 +341,14 @@ async function convertAsync(text, myRun){
       }
     }
   }
-  return out.join("");
+  return { text: out.join(""), map };
 }
 
 async function run(){
   const myRun = ++runId;
   const text = inputEl.value;
   if (text === ""){
-    outputEl.value = "";
+    outputEl.value = ""; tokMap = []; clearHL();
     statusEl.textContent = "";
     bar.classList.remove("on");
     return;
@@ -336,9 +356,11 @@ async function run(){
   const t0 = performance.now();
   const big = text.length > 20000;
   if (big){ bar.classList.add("on"); barfill.style.width = "0%"; statusEl.textContent = "Converting..."; }
-  const result = await convertAsync(text, myRun);
-  if (result === null || myRun !== runId) return;
-  outputEl.value = result;
+  const res = await convertAsync(text, myRun);
+  if (res === null || myRun !== runId) return;
+  outputEl.value = res.text;
+  tokMap = res.map;
+  clearHL();
   barfill.style.width = "100%";
   setTimeout(() => { if (myRun === runId) bar.classList.remove("on"); }, 300);
   const words = (text.match(/\S+/g) || []).length;
@@ -347,6 +369,39 @@ async function run(){
 function schedule(){ clearTimeout(timer); timer = setTimeout(run, 200); }
 
 inputEl.addEventListener("input", schedule);
+
+// ---- highlight the matching Unicode word when text is selected in the Preeti box ----
+const backdrop = $("backdrop");
+const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+function clearHL(){ backdrop.innerHTML = ""; }
+function showHL(s, e){
+  const t = inputEl.value;
+  backdrop.innerHTML = esc(t.slice(0, s)) + "<mark>" + esc(t.slice(s, e)) + "</mark>" + esc(t.slice(e)) + "\n";
+  const m = backdrop.querySelector("mark");
+  if (m && (m.offsetTop < inputEl.scrollTop || m.offsetTop > inputEl.scrollTop + inputEl.clientHeight - 40)){
+    inputEl.scrollTop = Math.max(0, m.offsetTop - 40);
+  }
+  backdrop.scrollTop = inputEl.scrollTop;
+}
+function syncFromOutput(){
+  if (document.activeElement !== outputEl) return;
+  const s = outputEl.selectionStart, e = outputEl.selectionEnd;
+  if (s === e || !tokMap.length){ clearHL(); return; }
+  // first word ending after s (binary search), last word starting before e
+  let lo = 0, hi = tokMap.length - 1, first = -1;
+  while (lo <= hi){
+    const mid = (lo + hi) >> 1;
+    if (tokMap[mid][3] > s){ first = mid; hi = mid - 1; } else lo = mid + 1;
+  }
+  if (first < 0 || tokMap[first][2] >= e){ clearHL(); return; }
+  let last = first;
+  while (last + 1 < tokMap.length && tokMap[last + 1][2] < e) last++;
+  showHL(tokMap[first][0], tokMap[last][1]);
+}
+document.addEventListener("selectionchange", syncFromOutput);
+outputEl.addEventListener("blur", clearHL);
+inputEl.addEventListener("scroll", () => { backdrop.scrollTop = inputEl.scrollTop; });
+inputEl.addEventListener("input", clearHL);
 
 // ---- preview font size (output box only) ----
 let outSize = 18;
@@ -390,7 +445,7 @@ document.querySelectorAll('input[name="pf"]').forEach(r => {
 
 $("clear").addEventListener("click", () => { inputEl.value = ""; fileName = "preeti"; run(); inputEl.focus(); });
 $("sample").addEventListener("click", () => {
-  inputEl.value = "नेपालको केन्द्रीय बैंकले आफ्नो नीति घोषणा गर्‍यो ।\nजनसङ्ख्याले महत्त्वपूर्ण भूमिका खेल्छ। उद्घाटन भक्तका हृदयका कट्ठा।\n'राष्ट्रवाद'को, 'गोरा', थाकेको/गलेको - २०८०/८१";
+  inputEl.value = "नेपालको केन्द्रीय बैंकले आफ्नो नीति घोषणा गर्‍यो ।\nजनसङ्ख्याले महत्त्वपूर्ण भूमिका खेल्छ। उद्घाटन भक्तका हृदयका कट्ठा।\n'राष्ट्रवाद'को, 'गोरा', थाकेको/गलेको - २०८०/८१\n(निर्वाचन विशेष)";
   run();
 });
 
