@@ -302,7 +302,8 @@ function convertWord(word){
 // straight single quotes: opening after start / space / bracket / dash, else closing
 const OPEN_Q = /(^|[\s(\[{<"\u201c\u2018\u2013\u2014\/-])'/gm;
 function preprocess(text){
-  return text.replace(OPEN_Q, (m, g) => g + "\u2018").split("'").join("\u2019");
+  return text.replace(OPEN_Q, (m, g) => g + "\u2018").split("'").join("\u2019")
+             .split(":").join("\u0903");   // typed ":" is treated as visarga ः -> M (same length, so highlight positions stay valid)
 }
 // ==== END CORE ====
 
