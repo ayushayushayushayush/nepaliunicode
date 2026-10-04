@@ -34,7 +34,21 @@
     background:transparent;color:var(--text);font-size:1.15rem;line-height:1.6;
   }
   #input{font-family:"Noto Sans Devanagari","Nirmala UI","Mangal",system-ui,sans-serif}
-  #output{font-family:Preeti,"Preeti Normal",monospace}
+  @font-face{
+    font-family:"KantipurWeb";
+    src:url("Kantipur%20Regular.ttf") format("truetype");
+    font-display:swap;
+  }
+  #output[data-font="current"]{font-family:Preeti,"Preeti Normal",monospace}
+  #output[data-font="kantipur"]{font-family:"KantipurWeb",monospace}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg label{padding:6px 12px;font-size:.85rem;cursor:pointer;color:var(--text);user-select:none}
+  .seg input{display:none}
+  .seg input:checked + span{font-weight:700;color:var(--accent)}
+  .seg label:has(input:checked){background:color-mix(in srgb, var(--accent) 14%, transparent)}
+  .seg label + label{border-left:1px solid var(--line)}
+  .head{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+  .fontwarn{font-size:.82rem;color:var(--warn);min-height:1.2em}
   textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
   .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
   button,label.btn{
@@ -73,8 +87,15 @@
     </div>
 
     <div class="card">
-      <h2>Preeti</h2>
-      <textarea id="output" readonly spellcheck="false" placeholder="Preeti text appears here"></textarea>
+      <div class="head">
+        <h2>Preeti</h2>
+        <div class="seg" role="radiogroup" aria-label="Preview font">
+          <label title="Uses the Preeti font if it is installed on your computer"><input type="radio" name="pf" value="current" checked><span>Current look</span></label>
+          <label title="Uses Kantipur Regular.ttf from this website"><input type="radio" name="pf" value="kantipur"><span>Kantipur font</span></label>
+        </div>
+      </div>
+      <textarea id="output" data-font="current" readonly spellcheck="false" placeholder="Preeti text appears here"></textarea>
+      <div class="fontwarn" id="fontwarn"></div>
       <div class="row">
         <button id="copy" class="primary" type="button">Copy</button>
         <button id="download" type="button">Download .txt</button>
@@ -91,7 +112,7 @@
       <li>Click <b>Copy</b> (or <b>Download .txt</b>), then paste or open it in Word, PowerPoint, Photoshop, etc.</li>
       <li>Select the text and set the font to <b>Preeti</b>.</li>
     </ol>
-    <p style="margin:8px 0 0">Preeti text looks like gibberish (e.g. <code>g]kfn</code>) in any normal font. That is expected. The right-hand box only shows real Nepali if the Preeti font is installed on your computer. Keep downloaded files as UTF-8.</p>
+    <p style="margin:8px 0 0">Preeti text looks like gibberish (e.g. <code>g]kfn</code>) in any normal font. That is expected. The right-hand box only shows real Nepali if the Preeti font is installed on your computer, or if you switch the preview to <b>Kantipur font</b>, which this page loads itself. The switch changes only how the preview looks; the copied and downloaded text is the same either way. Keep downloaded files as UTF-8.</p>
   </div>
 
   <footer>Conversion rules based on the converter at ashesh.com.np/unicode-preeti, with extra fixes for half letters, word-final halant, reph placement, chandrabindu and several conjuncts.</footer>
@@ -307,6 +328,34 @@ async function run(){
 function schedule(){ clearTimeout(timer); timer = setTimeout(run, 200); }
 
 inputEl.addEventListener("input", schedule);
+
+// ---- preview font switch: "current" (installed Preeti) or bundled Kantipur ----
+async function kantipurLoaded(){
+  try{
+    const faces = await document.fonts.load('20px KantipurWeb', 'abc');
+    return faces.length > 0 && faces.every(f => f.status === "loaded");
+  }catch(err){ return false; }
+}
+async function setFont(mode, save){
+  outputEl.setAttribute("data-font", mode);
+  const warn = $("fontwarn");
+  warn.textContent = "";
+  if (mode === "kantipur" && !(await kantipurLoaded())){
+    warn.textContent = "Could not load \"Kantipur Regular.ttf\". It must be in the same folder as this page (same file name, same capitalisation).";
+  }
+  if (save){ try{ localStorage.setItem("previewFont", mode); }catch(err){} }
+}
+document.querySelectorAll('input[name="pf"]').forEach(r => {
+  r.addEventListener("change", () => { if (r.checked) setFont(r.value, true); });
+});
+(function(){
+  let m = null;
+  try{ m = localStorage.getItem("previewFont"); }catch(err){}
+  if (m === "kantipur"){
+    document.querySelector('input[name="pf"][value="kantipur"]').checked = true;
+    setFont("kantipur", false);
+  }
+})();
 
 $("clear").addEventListener("click", () => { inputEl.value = ""; fileName = "preeti"; run(); inputEl.focus(); });
 $("sample").addEventListener("click", () => {
