@@ -169,8 +169,9 @@ function convertCore(text){
   if (text === "") return text;
   let s = text;
 
-  // punctuation (before the table, which itself outputs "/", "(" and ")")
+  // punctuation (before the table, which itself outputs "/", "(" , ")" and "!")
   s = s.split("/").join("\u00f7");        // / -> ÷
+  s = s.split("!").join("\u03c0");        // ! -> π   (must stay before the table, which outputs "!" for १)
   s = s.split("-").join("\u2013");        // hyphen -> en dash
   s = s.split("(").join("-");             // ( -> -   (must stay after the hyphen line)
   s = s.split(")").join("_");             // ) -> _
