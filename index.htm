@@ -54,6 +54,8 @@
   }
   #output[data-font="current"]{font-family:Preeti,"Preeti Normal",monospace}
   #output[data-font="kantipur"]{font-family:"KantipurWeb",monospace}
+  /* placeholder is plain English: never draw it in Preeti/Kantipur, which remap Latin letters */
+  #output::placeholder{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
   .seg label{padding:6px 12px;font-size:.85rem;cursor:pointer;color:var(--text);user-select:none}
   .seg input{display:none}
