@@ -54,8 +54,8 @@
   }
   #output[data-font="current"]{font-family:Preeti,"Preeti Normal",monospace}
   #output[data-font="kantipur"]{font-family:"KantipurWeb",monospace}
-  /* placeholder is plain English: never draw it in Preeti/Kantipur, which remap Latin letters */
-  #output::placeholder{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  /* in "current look" the placeholder stays plain English; in Kantipur mode it is converted Nepali and uses the Kantipur font */
+  #output[data-font="current"]::placeholder{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
   .seg label{padding:6px 12px;font-size:.85rem;cursor:pointer;color:var(--text);user-select:none}
   .seg input{display:none}
@@ -417,8 +417,12 @@ async function kantipurLoaded(){
     return faces.length > 0 && faces.every(f => f.status === "loaded");
   }catch(err){ return false; }
 }
+const ENGLISH_PLACEHOLDER = outputEl.placeholder;
+// Nepali placeholder, converted with the same code as the main text so Kantipur draws it as Nepali
+const KANTIPUR_PLACEHOLDER = preprocess("यहाँ प्रिटी टेक्स्ट देखिनेछ").split(" ").map(convertWord).join(" ");
 async function setFont(mode, save){
   outputEl.setAttribute("data-font", mode);
+  outputEl.placeholder = mode === "kantipur" ? KANTIPUR_PLACEHOLDER : ENGLISH_PLACEHOLDER;
   const warn = $("fontwarn");
   warn.textContent = "";
   if (mode === "kantipur" && !(await kantipurLoaded())){
