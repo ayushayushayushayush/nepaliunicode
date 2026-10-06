@@ -151,6 +151,9 @@ function replaceFirst(s, a, b){
 
 const FINAL_HALANT = new RegExp("([" + CONS + "])\u094d(?![" + CONS + "])", "g");
 const TTA_HALF = new RegExp("\u0924\u094d\u0924\u094d(?=[" + CONS + "])", "g");
+// र् + ZWJ + य (गर्‍यो, भर्‍यो) is the single Preeti glyph ¥. Must run before the reph logic,
+// otherwise the ZWJ stops the reph from finding its consonant.
+const RA_ZWJ_YA = /\u0930\u094d\u200d(?=\u092f)/g;
 function glyphFor(key){ return ARRAY_TWO[ARRAY_ONE.indexOf(key)]; }
 const HALF_FIRST = [
   [/\u0932\u094d/g, glyphFor("\u0932\u094d")],           // ल्
@@ -177,6 +180,7 @@ function convertCore(text){
   s = s.split(")").join("_");             // ) -> _
   s = s.split(".").join("=");             // . -> =   (must stay before the table, which outputs "." for the danda)
   s = s.split("\u2019").join("\u00da");    // closing quote -> Ú
+  s = s.replace(RA_ZWJ_YA, () => "\u00a5"); // र्‍य -> ¥ (then य and the matra follow normally)
 
   // move the short-i matra in front of its consonant cluster
   let pos = s.indexOf("\u093f");
