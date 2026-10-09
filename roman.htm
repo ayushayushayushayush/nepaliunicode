@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nepali Unicode Converter – type in Roman, get Devanagari</title>
+<style>
+:root{
+  --bg:#eef1f7; --panel:#fff; --ink:#1b2438; --muted:#5d6980; --line:#cfd6e4;
+  --brand:#233a73; --brand-ink:#fff; --accent:#c8102e; --focus:#2f6df6;
+  --out-bg:#f7f9fd;
+  --deva:"Noto Sans Devanagari","Nirmala UI","Kohinoor Devanagari","Mangal","Lohit Devanagari",sans-serif;
+  --latin:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#10162a; --panel:#182040; --ink:#e8ecf7; --muted:#9aa6c2; --line:#2e3a63;
+    --brand:#7f9cf5; --brand-ink:#0d1226; --accent:#ff5a73; --focus:#8fb0ff; --out-bg:#131a35;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 var(--latin);min-height:100%}
+.wrap{max-width:1040px;margin:0 auto;padding:28px 18px 48px}
+.panes{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:760px){.panes{grid-template-columns:1fr}}
+.pane{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.pane label,.pane .cap{font-weight:600;font-size:14px;color:var(--muted)}
+textarea{width:100%;min-height:260px;resize:vertical;border:1px solid var(--line);border-radius:6px;padding:12px;background:var(--panel);color:var(--ink);font:18px/1.6 var(--latin)}
+#out{font:22px/1.7 var(--deva);background:var(--out-bg)}
+textarea:focus,button:focus-visible,summary:focus-visible,input:focus-visible{outline:3px solid var(--focus);outline-offset:1px}
+.bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-top:14px}
+button{font:600 14px var(--latin);padding:9px 16px;border-radius:6px;border:1px solid var(--brand);background:var(--brand);color:var(--brand-ink);cursor:pointer}
+button.ghost{background:transparent;color:var(--brand)}
+button:hover{filter:brightness(1.08)}
+.opt{display:flex;gap:7px;align-items:center;font-size:14px;cursor:pointer}
+.opt input{width:17px;height:17px;accent-color:var(--brand)}
+.stat{margin-left:auto;font-size:13px;color:var(--muted)}
+details{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px 16px}
+summary{cursor:pointer;font-weight:600;padding:12px 0}
+.hint{font-weight:400;color:var(--muted);font-size:14px}
+#guide h3{margin:18px 0 2px;font-size:16px}
+#guide p{margin:0 0 10px;color:var(--muted);font-size:14px;max-width:70ch}
+.ref{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;padding-bottom:6px}
+.ref button{display:flex;justify-content:space-between;align-items:baseline;gap:10px;text-align:left;background:var(--out-bg);color:var(--ink);border:1px solid var(--line);font-weight:500}
+.ref .r{font-family:ui-monospace,Consolas,monospace;font-size:13px;overflow-wrap:anywhere}
+.ref .d{font:18px var(--deva);text-align:right}
+.ref .n{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+#guide{padding-bottom:12px}
+@media (prefers-reduced-motion:no-preference){button{transition:filter .15s}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <main>
+    <div class="panes">
+      <section class="pane">
+        <label for="in">Romanized Nepali</label>
+        <textarea id="in" spellcheck="false" autofocus placeholder="namaste, mero naam raam ho."></textarea>
+      </section>
+      <section class="pane">
+        <label for="out">Nepali Unicode</label>
+        <textarea id="out" readonly placeholder="नमस्ते, मेरो नाम राम हो ।"></textarea>
+      </section>
+    </div>
+
+    <div class="bar">
+      <button id="copy" type="button">Copy Nepali text</button>
+      <button id="clear" type="button" class="ghost">Clear</button>
+      <label class="opt"><input id="smart" type="checkbox" checked> Smart converter</label>
+      <span class="stat" id="status" role="status" aria-live="polite"></span>
+    </div>
+
+    <details open>
+      <summary>Typing guide <span class="hint">– click any example to add it to your text</span></summary>
+      <div id="guide"></div>
+    </details>
+  </main>
+</div>
+
+<script>
+/**
+ * nepali-unicode.js
+ * Romanized Nepali -> Devanagari (Unicode) converter.
+ *
+ * Extracted and de-obfuscated from the inline, eval-packed script on the
+ * "Nepali Unicode Converter" web page. Behaviour is intended to match the
+ * original (see "Differences" at the bottom). No dependencies; works in the
+ * browser (global `NepaliUnicode`) and in Node/CommonJS.
+ *
+ *   NepaliUnicode.toNepali('namaste')                      // smart mode on (default)
+ *   NepaliUnicode.toNepali('namaste', { smart: false })    // plain table lookup
+ *   NepaliUnicode.toNepali('ram', { html: true })          // "&#2352;&#2366;&#2350;"
+ *
+ * Input conventions (same as the original page):
+ *   {text}   keep `text` as-is (e.g. English words)
+ *   [text]   (smart mode only) convert `text` with smart mode temporarily off
+ *   \        explicit halant (virama), e.g. "k\" -> "क्"
+ *   *  **    anusvara (ं) / chandrabindu (ँ)
+ *   .        danda (।)
+ *   T D N Sh  capital letters are significant (retroflex ट ड ण, and ष)
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.NepaliUnicode = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  // ---------------------------------------------------------------- tables
+
+  const HALANT = '\u094D'; // ्
+  const ZWJ = '\u200D';
+
+  // Vowel signs (matras) attached to a consonant.
+  const MATRA = {
+    a: '\u093E',  // ा  (consonant + "a" -> long aa sound, e.g. "kaa")
+    i: '\u093F',  // ि
+    ee: '\u0940', // ी
+    u: '\u0941',  // ु
+    oo: '\u0942', // ू
+    ri: '\u0943', // ृ
+    e: '\u0947',  // े
+    ai: '\u0948', // ै
+    o: '\u094B',  // ो
+    au: '\u094C', // ौ
+  };
+
+  // Base consonants, keyed by their "…a" romanization. Order matters: the
+  // expansion loop below uses "first definition wins".
+  const CONSONANTS = [
+  ['ba', 'ब'],
+  ['bha', 'भ'],
+  ['ca', 'क'],
+  ['cha', 'च'],
+  ['chha', 'छ'],
+  ['Da', 'ड'],
+  ['da', 'द'],
+  ['dha', 'ध'],
+  ['Dha', 'ढ'],
+  ['fa', 'फ'],
+  ['ga', 'ग'],
+  ['gha', 'घ'],
+  ['gya', 'ज्ञ'],
+  ['ha', 'ह'],
+  ['ja', 'ज'],
+  ['jha', 'झ'],
+  ['ka', 'क'],
+  ['kha', 'ख'],
+  ['ksha', 'क्ष'],
+  ['la', 'ल'],
+  ['ma', 'म'],
+  ['Na', 'ण'],
+  ['na', 'न'],
+  ['Nepala', 'नेपाल'],
+  ['nga', 'ङ'],
+  ['pa', 'प'],
+  ['pha', 'फ'],
+  ['qa', 'क'],
+  ['ra', 'र'],
+  ['sa', 'स'],
+  ['sha', 'श'],
+  ['Sha', 'ष'],
+  ['ta', 'त'],
+  ['Ta', 'ट'],
+  ['Tha', 'ठ'],
+  ['tha', 'थ'],
+  ['va', 'व'],
+  ['wa', 'व'],
+  ['xa', 'क्स'],
+  ['ya', 'य'],
+  ['yna', 'ञ'],
+  ['za', 'ज'],
+  ];
+
+  // Everything that is not generated from CONSONANTS.
+  const BASE = {
+    '*': '\u0902',   // ं
+    '**': '\u0901',  // ँ
+    '.': '\u0964',   // ।
+    '\\': HALANT,    // explicit halant
+    0: '\u0966', 1: '\u0967', 2: '\u0968', 3: '\u0969', 4: '\u096A',
+    5: '\u096B', 6: '\u096C', 7: '\u096D', 8: '\u096E', 9: '\u096F',
+    a: 'अ', aa: 'आ', ai: 'ऐ', am: 'अ' + HALANT, au: 'औ', aum: 'ॐ',
+    e: 'ए', i: 'इ', ii: 'ई', o: 'ओ', om: 'ॐ', oo: 'ऊ', u: 'उ',
+    rri: 'ऋ', rree: 'ॠ',
+    rr: 'र' + HALANT + ZWJ,   // eye-lash ra (र्‍)
+    'ri^': HALANT + 'र' + 'ि', // "ri^" -> ्रि
+  };
+
+  /**
+   * Build the full lookup table. For every consonant "Xa" this adds:
+   *   Xa -> C            (inherent vowel)         Xaa -> C+ा
+   *   Xi, Xee, Xu, Xoo, Xri, Xe, Xai, Xo, Xau -> C + matra
+   *   X  -> C + ्         (bare consonant = half form)
+   * Existing keys are never overwritten.
+   */
+  function buildTable() {
+    const t = Object.create(null); // no inherited keys like "constructor"
+    for (const k of Object.keys(BASE)) t[k] = BASE[k];
+
+    for (const [key, val] of CONSONANTS) {
+      const stem = key.slice(0, -1); // "ka" -> "k"
+      const add = (k, v) => { if (!t[k]) t[k] = v; };
+      add(key, val);
+      add(key + 'a', val + MATRA.a);
+      add(stem + 'i', val + MATRA.i);
+      add(stem + 'ee', val + MATRA.ee);
+      add(stem + 'u', val + MATRA.u);
+      add(stem + 'oo', val + MATRA.oo);
+      add(stem + 'ri', val + MATRA.ri);
+      add(stem + 'e', val + MATRA.e);
+      add(stem + 'ai', val + MATRA.ai);
+      add(stem + 'o', val + MATRA.o);
+      add(stem + 'au', val + MATRA.au);
+      add(stem, val + HALANT);
+    }
+    return t;
+  }
+
+  const TABLE = buildTable();
+
+  // Smart mode: whole-word overrides (matched on the raw, case-sensitive word).
+  const WORD_OVERRIDES = new Map([
+    ['cha', 'chha'], ['chu', 'chhu'], ['chha', 'chha'],
+    ['ma', 'ma'], ['aba', 'aba'], ['nam', 'naam'], ['ram', 'raam'],
+    ['pani', 'pani'], ['lai', 'laaii'], ['pai', 'paaii'],
+    ['dai', 'daaii'], ['bhai', 'bhaaii'],
+  ]);
+
+  // ------------------------------------------------------------- internals
+
+  const isVowel = (c) => !!c && 'aeiou'.includes(c.toLowerCase()) && c.length === 1;
+
+  /**
+   * Convert the output of a table hit to a string.
+   * `isLast` = nothing (but whitespace / one trailing "\") remains after this
+   * chunk in the word. In smart mode a trailing halant is dropped there, so
+   * "ram" -> राम not राम्. Single-character values (e.g. "\" itself) are kept.
+   */
+  function render(value, isLast, smart, html) {
+    let v = value;
+    if (isLast && smart && v.length > 1 && v.endsWith(HALANT)) v = v.slice(0, -1);
+    if (!html) return v;
+    let out = '';
+    for (const ch of v) out += '&#' + ch.codePointAt(0) + ';';
+    return out;
+  }
+
+  /** Greedy longest-prefix conversion of one slash-free chunk. */
+  function convertChunk(s, smart, html) {
+    // Protect the case-sensitive letters (T D N Sh), lowercase the rest.
+    let rest = s
+      .replace(/T/g, '^^t^^').replace(/D/g, '^^d^^').replace(/N/g, '^^n^^')
+      .replace(/SH/g, '^^sh^^').replace(/Sh/g, '^^sh^^')
+      .toLowerCase()
+      .replace(/\^\^t\^\^/g, 'T').replace(/\^\^d\^\^/g, 'D')
+      .replace(/\^\^n\^\^/g, 'N').replace(/\^\^sh\^\^/g, 'Sh');
+
+    let out = '';
+    let head = rest;   // candidate prefix currently being tried
+    let tail = '';     // what has been cut off the end of `head`
+    while (head.length > 0) {
+      const hit = TABLE[head];
+      if (hit || head.length <= 1) {
+        if (hit) {
+          const isLast = !(tail.replace(/^\s+|\s+|\\$/, '').length > 0);
+          out += render(hit, isLast, smart, html);
+        } else {
+          out += head; // unmapped character: pass through
+        }
+        head = tail;
+        tail = '';
+      } else {
+        tail = head.charAt(head.length - 1) + tail;
+        head = head.substring(0, head.length - 1);
+      }
+    }
+    return out.length === 0 ? s : out;
+  }
+
+  /** Smart-mode spelling fix-ups applied to a single space-delimited word. */
+  function smartAdjust(word) {
+    if (WORD_OVERRIDES.has(word)) return WORD_OVERRIDES.get(word);
+    if (word.length <= 3) return word;
+
+    const n = word.length;
+    const c0 = word[n - 1].toLowerCase();
+    const c1 = word[n - 2].toLowerCase();
+    const c2 = word[n - 3].toLowerCase();
+    const c3 = word[n - 4].toLowerCase();
+
+    if ((c0 === 'a' || c0 === 'e' || c0 === 'u') && c1 === 'h' && c2 === 'c') {
+      word = word.slice(0, n - 3) + 'chh' + c0;            // …cha -> …chha
+    } else if (c0 === 'y') {
+      word = word.slice(0, n - 1) + 'ree';                  // …y   -> …ree
+    } else if (c0 === 'a' && c1 === 'h' && c2 === 'h') {
+      /* …hha: leave alone */
+    } else if (c0 === 'a' && c1 === 'n' && (c2 === 'k' || c2 === 'h' || c2 === 'r')) {
+      /* …kna / …hna / …rna: leave alone */
+    } else if (c0 === 'a' && c1 === 'r' && c2 === 'd' && c3 === 'n') {
+      /* …ndra: leave alone */
+    } else if (c0 === 'a' && c1 === 'r' && c2 === 't' && c3 === 'n') {
+      /* …ntra: leave alone */
+    } else if (
+      c0 === 'a' &&
+      (c1 === 'm' || (!isVowel(c1) && !isVowel(c3) && c1 !== 'y' && c2 !== 'e'))
+    ) {
+      word += 'a';                                          // add the long "aa"
+    }
+    if (c0 === 'i' && !isVowel(c1)) word = word.slice(0, -1) + 'ee'; // …Ci -> …Cee
+    return word;
+  }
+
+  /** Convert a run of text (words separated by single spaces). */
+  function convertWords(text, smart, html) {
+    if (smart) text = text.replace(/\s*\./g, ' .').replace(/\s*\?/g, ' ?');
+    const words = text.split(' ');
+    let out = '';
+    for (let w of words) {
+      w = w.replace(/ri\^/g, 'ari^');
+      if (smart) w = smartAdjust(w);
+      for (const sub of w.split('/')) {      // "/" splits a word without a space
+        if (sub.length !== 0) out += convertChunk(sub, smart, html);
+      }
+      out += ' ';
+    }
+    return out;
+  }
+
+  /**
+   * Replace delimited spans ({…} or […]) with placeholders so they can be
+   * handled separately. Mirrors the original's scan, including an unclosed
+   * opener running to the end of the input.
+   */
+  function maskSpans(input, open, close, counter, onSpan) {
+    let begin = 0, end = -1;
+    while (begin > -1 && end < input.length - 1) {
+      begin = input.indexOf(open, end + 1);
+      if (begin > -1) {
+        end = input.indexOf(close, begin + 1);
+        if (end === -1) end = input.length - 1;
+        const token = input.substring(begin, end + 1);
+        const mask = '$-' + counter.n + '-$';
+        onSpan(mask, token.substring(1, token.length - 1));
+        input = input.replace(token, () => mask);
+        end = end - token.length + mask.length;
+        counter.n++;
+      }
+    }
+    return input;
+  }
+
+  // ---------------------------------------------------------------- public
+
+  /**
+   * @param {string} input
+   * @param {{smart?: boolean, html?: boolean}} [opts]  smart defaults to true
+   * @returns {string}
+   */
+  function toNepali(input, opts) {
+    const smart = !opts || opts.smart === undefined ? true : !!opts.smart;
+    const html = !!(opts && opts.html);
+    const counter = { n: 1 };
+
+    const literal = Object.create(null);     // {…} spans: copied verbatim
+    input = maskSpans(input, '{', '}', counter, (m, text) => { literal[m] = text; });
+
+    const plain = Object.create(null);       // […] spans: smart mode off
+    if (smart) {
+      input = maskSpans(input, '[', ']', counter, (m, text) => {
+        plain[m] = convertWords(text, false, html);
+      });
+    }
+
+    let out = convertWords(input, smart, html);
+
+    const maskKey = (m) => convertWords(m, smart, html).replace(' ', '');
+    if (smart) {
+      for (const m in plain) {
+        out = out.replace(maskKey(m), () => plain[m].replace(/\s$/, ''));
+      }
+    }
+    for (const m in literal) {
+      out = out.replace(maskKey(m), () => literal[m]);
+    }
+    return out;
+  }
+
+  return { toNepali, TABLE };
+
+  // Differences from the original page script (intentional):
+  //  * Lookup tables use prototype-less objects/Map, so words like
+  //    "constructor" or "__proto__" no longer break the converter.
+  //  * {…} / […] replacements use function replacers, so "$&", "$1" etc.
+  //    inside those spans are copied literally instead of being interpreted.
+  //  * The original's unused "special word" (sW) mechanism is dropped; it was
+  //    never populated, so it had no effect.
+});
+
+</script>
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id)};
+  var inp=$('in'), out=$('out'), smart=$('smart'), status=$('status');
+
+  function convert(){
+    // the converter appends one space after every word; drop the last one so output mirrors input
+    out.value=inp.value?NepaliUnicode.toNepali(inp.value,{smart:smart.checked}).replace(/ $/,''):'';
+    var n=inp.value.length;
+    status.textContent=n?n+' character'+(n===1?'':'s'):'';
+  }
+  inp.addEventListener('input',convert);
+  smart.addEventListener('change',convert);
+
+  $('clear').addEventListener('click',function(){
+    if(inp.value.length>=30 && !confirm('Clear everything you typed?')) return;
+    inp.value=''; convert(); inp.focus();
+  });
+
+  var flash;
+  function say(msg){status.textContent=msg;clearTimeout(flash);flash=setTimeout(convert,1600)}
+  $('copy').addEventListener('click',function(){
+    if(!out.value){say('Nothing to copy yet');return}
+    function fallback(){out.focus();out.select();try{document.execCommand('copy');say('Copied')}catch(e){say('Press Ctrl+C to copy')}}
+    if(navigator.clipboard&&window.isSecureContext){
+      navigator.clipboard.writeText(out.value).then(function(){say('Copied')},fallback);
+    } else fallback();
+  });
+
+  // Typing guide. Every Devanagari result is produced by the converter itself,
+  // so what the guide shows is exactly what typing it will give.
+  var guide=[
+    {h:'Letters where upper and lower case differ',
+     p:'Capitals give the harder sounds. For every other letter, case makes no difference.',
+     items:['ta','Ta','tha','Tha','da','Da','dha','Dha','na','Na','sha','Sha']},
+    {h:'Special characters',
+     items:[['pri^','ri^ : ra sign, as in \u092A\u094D\u0930\u093F'],['garrya','rr : as in \u0917\u0930\u094D\u200D\u092F'],
+            ['rri'],['rree'],['yna'],['chha'],['kshetra','ksha'],['gyaan','gya'],
+            ['sa*bidhaan','* : anusvara'],['maa**','** : chandrabindu'],['om']]},
+    {h:'Keep English words',
+     p:'Put any English text inside curly braces { } and it stays as typed.',
+     items:[['yo {mobile} mero ho']]},
+    {h:'Separate letters with a slash',
+     p:'If a letter joins the one before it by mistake, put / between them. The slash is not shown.',
+     items:[['pratishatko'],['pratishat/ko'],['sagarmaathaa'],['sagar/maathaa']]},
+    {h:'Keep the final halant',
+     p:'Smart mode drops the halant at the end of a word. Add a backslash \\ to keep it.',
+     items:[['bas'],['bas\\']]},
+    {h:'Example words',
+     items:['namaskaar','dhanyawaad','sa*vidhaan','sa\\watantrataa','sa/mjh/naa','chamatkaar','kaaThamaaDau*','nepaali yunikoD','mero desh Nepal ho']}
+  ];
+  var root=$('guide');
+  function add(text){
+    inp.value+=(inp.value&&!/\s$/.test(inp.value)?' ':'')+text; convert(); inp.focus();
+  }
+  guide.forEach(function(g){
+    var h=document.createElement('h3'); h.textContent=g.h; root.appendChild(h);
+    if(g.p){var p=document.createElement('p'); p.textContent=g.p; root.appendChild(p)}
+    var grid=document.createElement('div'); grid.className='ref';
+    g.items.forEach(function(it){
+      var roman=typeof it==='string'?it:it[0], note=typeof it==='string'?'':(it[1]||'');
+      var b=document.createElement('button'); b.type='button';
+      var left=document.createElement('span');
+      var r=document.createElement('span'); r.className='r'; r.textContent=roman; left.appendChild(r);
+      if(note){var n=document.createElement('span'); n.className='n'; n.textContent=note; left.appendChild(n)}
+      var d=document.createElement('span'); d.className='d';
+      d.textContent=NepaliUnicode.toNepali(roman,{smart:true}).trim();
+      b.appendChild(left); b.appendChild(d);
+      b.addEventListener('click',function(){add(roman)});
+      grid.appendChild(b);
+    });
+    root.appendChild(grid);
+  });
+  convert();
+})();
+</script>
+</body>
+</html>
