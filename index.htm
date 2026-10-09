@@ -3,135 +3,438 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Unicode to Preeti Converter</title>
+<title>Nepali Unicode Converter – type in Roman, get Devanagari</title>
 <style>
-  :root{
-    --bg:#f6f7f9; --card:#ffffff; --text:#1d2330; --muted:#667085; --line:#d9dde5;
-    --accent:#2457d6; --accent-text:#ffffff; --ok:#1a7f4b; --warn:#b54708;
+:root{
+  --bg:#eef1f7; --panel:#fff; --ink:#1b2438; --muted:#5d6980; --line:#cfd6e4;
+  --brand:#233a73; --brand-ink:#fff; --accent:#c8102e; --focus:#2f6df6;
+  --out-bg:#f7f9fd; --miss:#d91e2e;
+  --deva:"Noto Sans Devanagari","Nirmala UI","Kohinoor Devanagari","Mangal","Lohit Devanagari",sans-serif;
+  --latin:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#10162a; --panel:#182040; --ink:#e8ecf7; --muted:#9aa6c2; --line:#2e3a63;
+    --brand:#7f9cf5; --brand-ink:#0d1226; --accent:#ff5a73; --focus:#8fb0ff; --out-bg:#131a35; --miss:#ff5c66;
   }
-  @media (prefers-color-scheme: dark){
-    :root{
-      --bg:#14171d; --card:#1d222b; --text:#e8ebf1; --muted:#9aa4b5; --line:#343b48;
-      --accent:#6b93ff; --accent-text:#0d1220; --ok:#4cc58a; --warn:#f0a35e;
-    }
-  }
-  *{box-sizing:border-box}
-  html,body{margin:0}
-  body{
-    background:var(--bg); color:var(--text);
-    font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Devanagari","Nirmala UI",sans-serif;
-    padding:24px 16px 48px;
-  }
-  .wrap{max-width:1100px;margin:0 auto}
-  h1{font-size:1.5rem;margin:0 0 4px}
-  p.sub{margin:0 0 20px;color:var(--muted)}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  @media (max-width:760px){.grid{grid-template-columns:1fr}}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
-  .card h2{font-size:.95rem;margin:0;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
-  textarea{
-    width:100%;min-height:340px;resize:vertical;padding:12px;border:1px solid var(--line);border-radius:8px;
-    background:transparent;color:var(--text);font-size:1.15rem;line-height:1.6;
-  }
-  #input{font-family:"Noto Sans Devanagari","Nirmala UI","Mangal",system-ui,sans-serif}
-
-  /* highlight backdrop behind the Unicode input */
-  .hl{position:relative;display:flex}
-  .hl textarea{position:relative;z-index:1;background:transparent;flex:1;display:block;overflow-y:scroll}
-  #backdrop{
-    position:absolute;inset:0;margin:0;padding:12px;border:1px solid transparent;border-radius:8px;
-    white-space:pre-wrap;overflow-wrap:break-word;overflow-y:scroll;pointer-events:none;
-    color:transparent;font-size:1.15rem;line-height:1.6;
-    font-family:"Noto Sans Devanagari","Nirmala UI","Mangal",system-ui,sans-serif;
-    scrollbar-color:transparent transparent;
-  }
-  #backdrop mark{color:transparent;background:color-mix(in srgb, var(--accent) 35%, transparent);border-radius:3px}
-
-  @font-face{
-    font-family:"KantipurWeb";
-    src:url("Kantipur%20Regular.ttf") format("truetype");
-    font-display:swap;
-  }
-  #output[data-font="current"]{font-family:Preeti,"Preeti Normal",monospace}
-  #output[data-font="kantipur"]{font-family:"KantipurWeb",monospace}
-  /* in "current look" the placeholder stays plain English; in Kantipur mode it is converted Nepali and uses the Kantipur font */
-  #output[data-font="current"]::placeholder{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
-  .seg label{padding:6px 12px;font-size:.85rem;cursor:pointer;color:var(--text);user-select:none}
-  .seg input{display:none}
-  .seg input:checked + span{font-weight:700;color:var(--accent)}
-  .seg label:has(input:checked){background:color-mix(in srgb, var(--accent) 14%, transparent)}
-  .seg label + label{border-left:1px solid var(--line)}
-  .head{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
-  .sizebtns{display:inline-flex;align-items:center;gap:4px}
-  .sizebtns button{padding:4px 10px;font-weight:700;line-height:1.2}
-  .sizebtns span{font-size:.8rem;color:var(--muted);min-width:2.6em;text-align:center}
-  .fontwarn{font-size:.82rem;color:var(--warn);min-height:1.2em}
-  textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
-  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-  button,label.btn{
-    font:inherit;font-size:.92rem;padding:8px 14px;border-radius:8px;border:1px solid var(--line);
-    background:var(--card);color:var(--text);cursor:pointer;
-  }
-  button:hover,label.btn:hover{border-color:var(--accent)}
-  button.primary{background:var(--accent);color:var(--accent-text);border-color:var(--accent);font-weight:600}
-  input[type=file]{display:none}
-  .status{font-size:.85rem;color:var(--muted);min-height:1.3em}
-  .bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;visibility:hidden}
-  .bar.on{visibility:visible}
-  .bar>div{height:100%;width:0;background:var(--accent);transition:width .08s linear}
-  .note{margin-top:16px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--card);font-size:.9rem;color:var(--muted)}
-  .note b{color:var(--text)}
-  .note ol{margin:6px 0 0 18px;padding:0}
-  footer{margin-top:18px;font-size:.8rem;color:var(--muted)}
-  a{color:var(--accent)}
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 var(--latin);min-height:100%}
+.wrap{max-width:1040px;margin:0 auto;padding:28px 18px 48px}
+.panes{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:760px){.panes{grid-template-columns:1fr}}
+.pane{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.pane label,.pane .cap{font-weight:600;font-size:14px;color:var(--muted)}
+textarea{width:100%;min-height:260px;resize:vertical;border:1px solid var(--line);border-radius:6px;padding:12px;background:var(--panel);color:var(--ink);font:18px/1.6 var(--latin)}
+.hl{position:relative;display:flex;background:var(--out-bg);border-radius:6px}
+#out,#mirror{font:22px/1.7 var(--deva)}
+#out{position:relative;z-index:1;flex:1;background:transparent}
+#mirror{position:absolute;inset:0;margin:0;padding:12px;border:1px solid transparent;overflow:hidden;white-space:pre-wrap;overflow-wrap:break-word;color:transparent;pointer-events:none}
+#mirror mark{background:none;color:transparent;text-decoration-line:underline;text-decoration-style:wavy;text-decoration-color:var(--miss);text-decoration-thickness:2px;text-underline-offset:.18em}
+@font-face{font-family:"KantipurWeb";src:url("Kantipur%20Regular.ttf") format("truetype");font-display:swap}
+#out[data-font="kantipur"],#mirror[data-font="kantipur"]{font-family:"KantipurWeb",monospace;font-size:26px;line-height:1.6}
+.warn{margin:10px 0 0;color:var(--accent);font-size:14px}
+.warn:empty{display:none}
+.spell{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-top:10px;font-size:14px;color:var(--muted)}
+.spell[hidden]{display:none}
+.spell button{padding:5px 12px;font-size:13px}
+#mirror mark{cursor:pointer}
+#tip{position:fixed;z-index:50;display:block;max-width:min(92vw,380px);background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 28px rgba(15,25,60,.22);padding:10px 12px}
+#tip[hidden]{display:none}
+#tiphead{font-size:13px;color:var(--muted);margin-bottom:8px}
+#tiplist{display:flex;flex-wrap:wrap;gap:6px}
+#tiplist button{font:20px/1.3 "KantipurWeb",monospace;font-weight:400;padding:3px 10px;background:var(--out-bg);color:var(--ink);border:1px solid var(--line)}
+#tiplist button:hover{border-color:var(--brand)}
+#tipnote{font-size:12px;color:var(--accent);margin-top:8px}
+#tipnote:empty{display:none}
+textarea:focus,button:focus-visible,summary:focus-visible,input:focus-visible{outline:3px solid var(--focus);outline-offset:1px}
+.bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-top:14px}
+button{font:600 14px var(--latin);padding:9px 16px;border-radius:6px;border:1px solid var(--brand);background:var(--brand);color:var(--brand-ink);cursor:pointer}
+button.ghost{background:transparent;color:var(--brand)}
+button:hover{filter:brightness(1.08)}
+.opt{display:flex;gap:7px;align-items:center;font-size:14px;cursor:pointer}
+.opt input{width:17px;height:17px;accent-color:var(--brand)}
+.stat{margin-left:auto;font-size:13px;color:var(--muted)}
+details{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px 16px}
+summary{cursor:pointer;font-weight:600;padding:12px 0}
+.hint{font-weight:400;color:var(--muted);font-size:14px}
+#guide h3{margin:18px 0 2px;font-size:16px}
+#guide p{margin:0 0 10px;color:var(--muted);font-size:14px;max-width:70ch}
+.ref{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;padding-bottom:6px}
+.ref button{display:flex;justify-content:space-between;align-items:baseline;gap:10px;text-align:left;background:var(--out-bg);color:var(--ink);border:1px solid var(--line);font-weight:500}
+.ref .r{font-family:ui-monospace,Consolas,monospace;font-size:13px;overflow-wrap:anywhere}
+.ref .d{font:18px var(--deva);text-align:right}
+.ref .n{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+#guide{padding-bottom:12px}
+@media (prefers-reduced-motion:no-preference){button{transition:filter .15s}}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="grid">
-    <div class="card">
-      <h2>Nepali Unicode</h2>
-      <div class="hl">
-        <div id="backdrop" aria-hidden="true"></div>
-        <textarea id="input" placeholder="यहाँ नेपाली युनिकोड टेक्स्ट टाइप वा पेस्ट गर्नुहोस्..." spellcheck="false"></textarea>
-      </div>
-      <div class="row">
-        <label class="btn" for="file">Open .txt file</label>
-        <input type="file" id="file" accept=".txt,text/plain">
-        <button id="sample" type="button">Sample</button>
-        <button id="clear" type="button">Clear</button>
-      </div>
+
+  <main>
+    <div class="panes">
+      <section class="pane">
+        <label for="in">Romanized Nepali</label>
+        <textarea id="in" spellcheck="false" autofocus placeholder="namaste, mero naam raam ho."></textarea>
+      </section>
+      <section class="pane">
+        <label for="out">Nepali Unicode</label>
+        <div class="hl"><div id="mirror" aria-hidden="true"></div><textarea id="out" readonly placeholder="नमस्ते, मेरो नाम राम हो ।"></textarea></div>
+      </section>
     </div>
 
-    <div class="card">
-      <div class="head">
-        <h2>Preeti</h2>
-        <div class="seg" role="radiogroup" aria-label="Preview font">
-          <label title="Uses the Preeti font if it is installed on your computer"><input type="radio" name="pf" value="current" checked><span>Current look</span></label>
-          <label title="Uses Kantipur Regular.ttf from this website"><input type="radio" name="pf" value="kantipur"><span>Kantipur font</span></label>
-        </div>
-        <div class="sizebtns" aria-label="Preview font size">
-          <button id="smaller" type="button" title="Decrease font size">A&minus;</button>
-          <span id="sizeval">18px</span>
-          <button id="bigger" type="button" title="Increase font size">A+</button>
-        </div>
-      </div>
-      <textarea id="output" data-font="current" readonly spellcheck="false" placeholder="Preeti text appears here"></textarea>
-      <div class="fontwarn" id="fontwarn"></div>
-      <div class="row">
-        <button id="copy" class="primary" type="button">Copy</button>
-        <button id="download" type="button">Download .txt</button>
-      </div>
+    <div class="bar">
+      <button id="copy" type="button">Copy Nepali text</button>
+      <button id="clear" type="button" class="ghost">Clear</button>
+      <label class="opt"><input id="smart" type="checkbox" checked> Smart converter</label>
+      <label class="opt"><input id="kant" type="checkbox"> Kantipur</label>
+      <label class="opt"><input id="spell" type="checkbox"> CheckSpell</label>
+      <span class="stat" id="status" role="status" aria-live="polite"></span>
     </div>
-  </div>
 
-  <div class="bar" id="bar"><div id="barfill"></div></div>
-  <div class="status" id="status"></div>
+    <p id="fontwarn" class="warn" role="alert"></p>
+    <div id="spellrow" class="spell" hidden>
+      <span id="spellinfo" role="status"></span>
+      <button id="dictbtn" type="button" class="ghost">Load eligible.txt…</button>
+      <input id="dictfile" type="file" accept=".txt,text/plain" hidden>
+    </div>
 
+    <details open>
+      <summary>Typing guide <span class="hint">– click any example to add it to your text</span></summary>
+      <div id="guide"></div>
+    </details>
+  </main>
+</div>
+
+<div id="tip" role="dialog" aria-label="Spelling suggestions" hidden>
+  <div id="tiphead"></div><div id="tiplist"></div><div id="tipnote"></div>
 </div>
 
 <script>
+/**
+ * nepali-unicode.js
+ * Romanized Nepali -> Devanagari (Unicode) converter.
+ *
+ * Extracted and de-obfuscated from the inline, eval-packed script on the
+ * "Nepali Unicode Converter" web page. Behaviour is intended to match the
+ * original (see "Differences" at the bottom). No dependencies; works in the
+ * browser (global `NepaliUnicode`) and in Node/CommonJS.
+ *
+ *   NepaliUnicode.toNepali('namaste')                      // smart mode on (default)
+ *   NepaliUnicode.toNepali('namaste', { smart: false })    // plain table lookup
+ *   NepaliUnicode.toNepali('ram', { html: true })          // "&#2352;&#2366;&#2350;"
+ *
+ * Input conventions (same as the original page):
+ *   {text}   keep `text` as-is (e.g. English words)
+ *   [text]   (smart mode only) convert `text` with smart mode temporarily off
+ *   \        explicit halant (virama), e.g. "k\" -> "क्"
+ *   *  **    anusvara (ं) / chandrabindu (ँ)
+ *   .        danda (।)
+ *   T D N Sh  capital letters are significant (retroflex ट ड ण, and ष)
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.NepaliUnicode = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  // ---------------------------------------------------------------- tables
+
+  const HALANT = '\u094D'; // ्
+  const ZWJ = '\u200D';
+
+  // Vowel signs (matras) attached to a consonant.
+  const MATRA = {
+    a: '\u093E',  // ा  (consonant + "a" -> long aa sound, e.g. "kaa")
+    i: '\u093F',  // ि
+    ee: '\u0940', // ी
+    u: '\u0941',  // ु
+    oo: '\u0942', // ू
+    ri: '\u0943', // ृ
+    e: '\u0947',  // े
+    ai: '\u0948', // ै
+    o: '\u094B',  // ो
+    au: '\u094C', // ौ
+  };
+
+  // Base consonants, keyed by their "…a" romanization. Order matters: the
+  // expansion loop below uses "first definition wins".
+  const CONSONANTS = [
+  ['ba', 'ब'],
+  ['bha', 'भ'],
+  ['ca', 'क'],
+  ['cha', 'च'],
+  ['chha', 'छ'],
+  ['Da', 'ड'],
+  ['da', 'द'],
+  ['dha', 'ध'],
+  ['Dha', 'ढ'],
+  ['fa', 'फ'],
+  ['ga', 'ग'],
+  ['gha', 'घ'],
+  ['gya', 'ज्ञ'],
+  ['ha', 'ह'],
+  ['ja', 'ज'],
+  ['jha', 'झ'],
+  ['ka', 'क'],
+  ['kha', 'ख'],
+  ['ksha', 'क्ष'],
+  ['la', 'ल'],
+  ['ma', 'म'],
+  ['Na', 'ण'],
+  ['na', 'न'],
+  ['Nepala', 'नेपाल'],
+  ['nga', 'ङ'],
+  ['pa', 'प'],
+  ['pha', 'फ'],
+  ['qa', 'क'],
+  ['ra', 'र'],
+  ['sa', 'स'],
+  ['sha', 'श'],
+  ['Sha', 'ष'],
+  ['ta', 'त'],
+  ['Ta', 'ट'],
+  ['Tha', 'ठ'],
+  ['tha', 'थ'],
+  ['va', 'व'],
+  ['wa', 'व'],
+  ['xa', 'क्स'],
+  ['ya', 'य'],
+  ['yna', 'ञ'],
+  ['za', 'ज'],
+  ];
+
+  // Everything that is not generated from CONSONANTS.
+  const BASE = {
+    '*': '\u0902',   // ं
+    '**': '\u0901',  // ँ
+    '.': '\u0964',   // ।
+    '\\': HALANT,    // explicit halant
+    0: '\u0966', 1: '\u0967', 2: '\u0968', 3: '\u0969', 4: '\u096A',
+    5: '\u096B', 6: '\u096C', 7: '\u096D', 8: '\u096E', 9: '\u096F',
+    a: 'अ', aa: 'आ', ai: 'ऐ', am: 'अ' + HALANT, au: 'औ', aum: 'ॐ',
+    e: 'ए', i: 'इ', ii: 'ई', o: 'ओ', om: 'ॐ', oo: 'ऊ', u: 'उ',
+    rri: 'ऋ', rree: 'ॠ',
+    rr: 'र' + HALANT + ZWJ,   // eye-lash ra (र्‍)
+    'ri^': HALANT + 'र' + 'ि', // "ri^" -> ्रि
+  };
+
+  /**
+   * Build the full lookup table. For every consonant "Xa" this adds:
+   *   Xa -> C            (inherent vowel)         Xaa -> C+ा
+   *   Xi, Xee, Xu, Xoo, Xri, Xe, Xai, Xo, Xau -> C + matra
+   *   X  -> C + ्         (bare consonant = half form)
+   * Existing keys are never overwritten.
+   */
+  function buildTable() {
+    const t = Object.create(null); // no inherited keys like "constructor"
+    for (const k of Object.keys(BASE)) t[k] = BASE[k];
+
+    for (const [key, val] of CONSONANTS) {
+      const stem = key.slice(0, -1); // "ka" -> "k"
+      const add = (k, v) => { if (!t[k]) t[k] = v; };
+      add(key, val);
+      add(key + 'a', val + MATRA.a);
+      add(stem + 'i', val + MATRA.i);
+      add(stem + 'ee', val + MATRA.ee);
+      add(stem + 'u', val + MATRA.u);
+      add(stem + 'oo', val + MATRA.oo);
+      add(stem + 'ri', val + MATRA.ri);
+      add(stem + 'e', val + MATRA.e);
+      add(stem + 'ai', val + MATRA.ai);
+      add(stem + 'o', val + MATRA.o);
+      add(stem + 'au', val + MATRA.au);
+      add(stem, val + HALANT);
+    }
+    return t;
+  }
+
+  const TABLE = buildTable();
+
+  // Smart mode: whole-word overrides (matched on the raw, case-sensitive word).
+  const WORD_OVERRIDES = new Map([
+    ['cha', 'chha'], ['chu', 'chhu'], ['chha', 'chha'],
+    ['ma', 'ma'], ['aba', 'aba'], ['nam', 'naam'], ['ram', 'raam'],
+    ['pani', 'pani'], ['lai', 'laaii'], ['pai', 'paaii'],
+    ['dai', 'daaii'], ['bhai', 'bhaaii'],
+  ]);
+
+  // ------------------------------------------------------------- internals
+
+  const isVowel = (c) => !!c && 'aeiou'.includes(c.toLowerCase()) && c.length === 1;
+
+  /**
+   * Convert the output of a table hit to a string.
+   * `isLast` = nothing (but whitespace / one trailing "\") remains after this
+   * chunk in the word. In smart mode a trailing halant is dropped there, so
+   * "ram" -> राम not राम्. Single-character values (e.g. "\" itself) are kept.
+   */
+  function render(value, isLast, smart, html) {
+    let v = value;
+    if (isLast && smart && v.length > 1 && v.endsWith(HALANT)) v = v.slice(0, -1);
+    if (!html) return v;
+    let out = '';
+    for (const ch of v) out += '&#' + ch.codePointAt(0) + ';';
+    return out;
+  }
+
+  /** Greedy longest-prefix conversion of one slash-free chunk. */
+  function convertChunk(s, smart, html) {
+    // Protect the case-sensitive letters (T D N Sh), lowercase the rest.
+    let rest = s
+      .replace(/T/g, '^^t^^').replace(/D/g, '^^d^^').replace(/N/g, '^^n^^')
+      .replace(/SH/g, '^^sh^^').replace(/Sh/g, '^^sh^^')
+      .toLowerCase()
+      .replace(/\^\^t\^\^/g, 'T').replace(/\^\^d\^\^/g, 'D')
+      .replace(/\^\^n\^\^/g, 'N').replace(/\^\^sh\^\^/g, 'Sh');
+
+    let out = '';
+    let head = rest;   // candidate prefix currently being tried
+    let tail = '';     // what has been cut off the end of `head`
+    while (head.length > 0) {
+      const hit = TABLE[head];
+      if (hit || head.length <= 1) {
+        if (hit) {
+          const isLast = !(tail.replace(/^\s+|\s+|\\$/, '').length > 0);
+          out += render(hit, isLast, smart, html);
+        } else {
+          out += head; // unmapped character: pass through
+        }
+        head = tail;
+        tail = '';
+      } else {
+        tail = head.charAt(head.length - 1) + tail;
+        head = head.substring(0, head.length - 1);
+      }
+    }
+    return out.length === 0 ? s : out;
+  }
+
+  /** Smart-mode spelling fix-ups applied to a single space-delimited word. */
+  function smartAdjust(word) {
+    if (WORD_OVERRIDES.has(word)) return WORD_OVERRIDES.get(word);
+    if (word.length <= 3) return word;
+
+    const n = word.length;
+    const c0 = word[n - 1].toLowerCase();
+    const c1 = word[n - 2].toLowerCase();
+    const c2 = word[n - 3].toLowerCase();
+    const c3 = word[n - 4].toLowerCase();
+
+    if ((c0 === 'a' || c0 === 'e' || c0 === 'u') && c1 === 'h' && c2 === 'c') {
+      word = word.slice(0, n - 3) + 'chh' + c0;            // …cha -> …chha
+    } else if (c0 === 'y') {
+      word = word.slice(0, n - 1) + 'ree';                  // …y   -> …ree
+    } else if (c0 === 'a' && c1 === 'h' && c2 === 'h') {
+      /* …hha: leave alone */
+    } else if (c0 === 'a' && c1 === 'n' && (c2 === 'k' || c2 === 'h' || c2 === 'r')) {
+      /* …kna / …hna / …rna: leave alone */
+    } else if (c0 === 'a' && c1 === 'r' && c2 === 'd' && c3 === 'n') {
+      /* …ndra: leave alone */
+    } else if (c0 === 'a' && c1 === 'r' && c2 === 't' && c3 === 'n') {
+      /* …ntra: leave alone */
+    } else if (
+      c0 === 'a' &&
+      (c1 === 'm' || (!isVowel(c1) && !isVowel(c3) && c1 !== 'y' && c2 !== 'e'))
+    ) {
+      word += 'a';                                          // add the long "aa"
+    }
+    if (c0 === 'i' && !isVowel(c1)) word = word.slice(0, -1) + 'ee'; // …Ci -> …Cee
+    return word;
+  }
+
+  /** Convert a run of text (words separated by single spaces). */
+  function convertWords(text, smart, html) {
+    if (smart) text = text.replace(/\s*\./g, ' .').replace(/\s*\?/g, ' ?');
+    const words = text.split(' ');
+    let out = '';
+    for (let w of words) {
+      w = w.replace(/ri\^/g, 'ari^');
+      if (smart) w = smartAdjust(w);
+      for (const sub of w.split('/')) {      // "/" splits a word without a space
+        if (sub.length !== 0) out += convertChunk(sub, smart, html);
+      }
+      out += ' ';
+    }
+    return out;
+  }
+
+  /**
+   * Replace delimited spans ({…} or […]) with placeholders so they can be
+   * handled separately. Mirrors the original's scan, including an unclosed
+   * opener running to the end of the input.
+   */
+  function maskSpans(input, open, close, counter, onSpan) {
+    let begin = 0, end = -1;
+    while (begin > -1 && end < input.length - 1) {
+      begin = input.indexOf(open, end + 1);
+      if (begin > -1) {
+        end = input.indexOf(close, begin + 1);
+        if (end === -1) end = input.length - 1;
+        const token = input.substring(begin, end + 1);
+        const mask = '$-' + counter.n + '-$';
+        onSpan(mask, token.substring(1, token.length - 1));
+        input = input.replace(token, () => mask);
+        end = end - token.length + mask.length;
+        counter.n++;
+      }
+    }
+    return input;
+  }
+
+  // ---------------------------------------------------------------- public
+
+  /**
+   * @param {string} input
+   * @param {{smart?: boolean, html?: boolean}} [opts]  smart defaults to true
+   * @returns {string}
+   */
+  function toNepali(input, opts) {
+    const smart = !opts || opts.smart === undefined ? true : !!opts.smart;
+    const html = !!(opts && opts.html);
+    const counter = { n: 1 };
+
+    const literal = Object.create(null);     // {…} spans: copied verbatim
+    input = maskSpans(input, '{', '}', counter, (m, text) => { literal[m] = text; });
+
+    const plain = Object.create(null);       // […] spans: smart mode off
+    if (smart) {
+      input = maskSpans(input, '[', ']', counter, (m, text) => {
+        plain[m] = convertWords(text, false, html);
+      });
+    }
+
+    let out = convertWords(input, smart, html);
+
+    const maskKey = (m) => convertWords(m, smart, html).replace(' ', '');
+    if (smart) {
+      for (const m in plain) {
+        out = out.replace(maskKey(m), () => plain[m].replace(/\s$/, ''));
+      }
+    }
+    for (const m in literal) {
+      out = out.replace(maskKey(m), () => literal[m]);
+    }
+    return out;
+  }
+
+  return { toNepali, TABLE };
+
+  // Differences from the original page script (intentional):
+  //  * Lookup tables use prototype-less objects/Map, so words like
+  //    "constructor" or "__proto__" no longer break the converter.
+  //  * {…} / […] replacements use function replacers, so "$&", "$1" etc.
+  //    inside those spans are copied literally instead of being interpreted.
+  //  * The original's unused "special word" (sW) mechanism is dropped; it was
+  //    never populated, so it had no effect.
+});
+
+</script>
+<script>
+/* Unicode -> Kantipur/Preeti legacy encoding. CORE block copied unchanged from unicode_to_kantipur_logic.htm */
+var Kantipur=(function(){
 // ==== CORE ====
 const ARRAY_ONE = ["‘", "?", "क़", "ख़", "ग़", "ज़", "ड़", "ढ़", "फ़", "ॐ", "ऽ", "।", "m'", "m]", "mfF", "mF", "०", "१", "२", "३", "४", "५", "६", "७", "८", "९", "फ्र", "झ", "फ", "क्त", "क्र", "ल", "ज्ञ्", "द्घ", "ज्ञ", "द्द", "द्ध", "श्र", "रु", "द्य", "क्ष्", "क्ष", "त्त", "द्म", "त्र", "ध्र", "ङ्घ", "ड्ड", "द्र", "ट्ट", "ड्ढ", "ठ्ठ", "रू", "हृ", "ङ्ग", "त्र", "ङ्क", "ङ्ख", "ट्ठ", "द्व", "ट्र", "ठ्र", "ड्र", "ढ्र", "्र", "ड़", "ढ़", "क्", "क", "ख्", "ख", "ग्", "ग", "घ्", "घ", "ङ", "च्", "च", "छ", "ज्", "ज", "झ्", "झ", "ञ्", "ञ", "ट", "ठ", "ड", "ढ", "ण्", "ण", "त्", "त", "थ्", "थ", "द", "ध्", "ध", "न्", "न", "प्", "प", "फ्", "ब्", "ब", "भ्", "भ", "म्", "म", "य", "र", "ल्", "ल", "व्", "व", "श्", "श", "ष्", "ष", "स्", "स", "ह्", "ह", "्य", "ऑ", "ऑ", "औ", "ओ", "आ", "अ", "ई", "इ", "ऊ", "उ", "ऋ", "ऐ", "ए", "ॉ", "ू", "ु", "ं", "ा", "ृ", "्", "े", "ै", "ँ", "ी", "ः", "ो", "ौ"];
 const ARRAY_TWO = ["…", "<", "क़", "ख़", "ग़", "ज़", "ड़", "ढ़", "फ़", "ç", "˜", ".", "'m", "]m", "Fmf", "Fm", ")", "!", "@", "#", "$", "%", "^", "&", "*", "(", "k|m", "em", "km", "St", "qm", "n", "¡", "b\\3", "1", "2", "4", ">", "?", "B", "I", "If", "Q", "ß", "q", "„", "‹", "•", "ı", "§", "°", "¶", "¿", "X", "Ë", "Ì", "Í", "Î", "\uf002", "å", "6«", "7«", "8«", "9«", "|", "8Þ", "9Þ", "S", "s", "V", "v", "U", "u", "£", "3", "ª", "R", "r", "5", "H", "h", "‰", "´", "~", "`", "6", "7", "8", "9", "0", "0f", "T", "t", "Y", "y", "b", "W", "w", "G", "g", "K", "k", "Ï", "A", "a", "E", "e", "D", "d", "o", "/", "N", "n", "J", "j", "Z", "z", "i", "if", ":", ";", "X", "x", "Ø", "cf‘", "c‘f", "cf}", "cf]", "cf", "c", "O{", "O", "pm", "p", "C", "P]", "P", "f‘", "\"", "'", "+", "f", "[", "\\", "]", "}", "“", "L", "M", "f]", "f}"];
@@ -298,194 +601,366 @@ function preprocess(text){
   return text.replace(OPEN_Q, (m, g) => g + "\u2018").split("'").join("\u2019")
              .split(":").join("\u0903");   // typed ":" is treated as visarga ः -> M (same length, so highlight positions stay valid)
 }
-// ==== END CORE ====
 
-// ---------------------------- interface ---------------------------------
-const $ = id => document.getElementById(id);
-const inputEl = $("input"), outputEl = $("output"), statusEl = $("status");
-const bar = $("bar"), barfill = $("barfill");
-let runId = 0, timer = null, fileName = "preeti";
-let tokMap = [];   // [inStart, inEnd, outStart, outEnd] for each word
-
-// preprocess() only swaps one character for one character, so positions in the
-// preprocessed text match positions in the original input.
-async function convertAsync(text, myRun){
-  const toks = preprocess(text).split(/(\s+)/);
-  const out = [], map = [];
-  let inPos = 0, outPos = 0;
-  const total = text.length;
-  let done = 0, last = performance.now();
-  for (let n = 0; n < toks.length; n++){
-    const tok = toks[n];
-    if (tok === "") continue;
-    if (/^\s+$/.test(tok)){
-      out.push(tok); inPos += tok.length; outPos += tok.length;
-    } else {
-      const c = convertWord(tok);
-      map.push([inPos, inPos + tok.length, outPos, outPos + c.length]);
-      out.push(c); inPos += tok.length; outPos += c.length;
-    }
-    done += tok.length;
-    if ((n & 255) === 0){
-      const now = performance.now();
-      if (now - last >= 40){
-        barfill.style.width = (100 * done / total).toFixed(1) + "%";
-        await new Promise(r => setTimeout(r, 0));
-        if (myRun !== runId) return null;       // newer input arrived
-        last = performance.now();
-      }
-    }
-  }
-  return { text: out.join(""), map };
-}
-
-async function run(){
-  const myRun = ++runId;
-  const text = inputEl.value;
-  if (text === ""){
-    outputEl.value = ""; tokMap = []; clearHL();
-    statusEl.textContent = "";
-    bar.classList.remove("on");
-    return;
-  }
-  const t0 = performance.now();
-  const big = text.length > 20000;
-  if (big){ bar.classList.add("on"); barfill.style.width = "0%"; statusEl.textContent = "Converting..."; }
-  const res = await convertAsync(text, myRun);
-  if (res === null || myRun !== runId) return;
-  outputEl.value = res.text;
-  tokMap = res.map;
-  clearHL();
-  barfill.style.width = "100%";
-  setTimeout(() => { if (myRun === runId) bar.classList.remove("on"); }, 300);
-  const words = (text.match(/\S+/g) || []).length;
-  statusEl.textContent = words.toLocaleString() + " words converted in " + ((performance.now() - t0) / 1000).toFixed(2) + " s";
-}
-function schedule(){ clearTimeout(timer); timer = setTimeout(run, 200); }
-
-inputEl.addEventListener("input", schedule);
-
-// ---- highlight the matching Unicode word when text is selected in the Preeti box ----
-const backdrop = $("backdrop");
-const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-function clearHL(){ backdrop.innerHTML = ""; }
-function showHL(s, e){
-  const t = inputEl.value;
-  backdrop.innerHTML = esc(t.slice(0, s)) + "<mark>" + esc(t.slice(s, e)) + "</mark>" + esc(t.slice(e)) + "\n";
-  const m = backdrop.querySelector("mark");
-  if (m && (m.offsetTop < inputEl.scrollTop || m.offsetTop > inputEl.scrollTop + inputEl.clientHeight - 40)){
-    inputEl.scrollTop = Math.max(0, m.offsetTop - 40);
-  }
-  backdrop.scrollTop = inputEl.scrollTop;
-}
-function syncFromOutput(){
-  if (document.activeElement !== outputEl) return;
-  const s = outputEl.selectionStart, e = outputEl.selectionEnd;
-  if (s === e || !tokMap.length){ clearHL(); return; }
-  // first word ending after s (binary search), last word starting before e
-  let lo = 0, hi = tokMap.length - 1, first = -1;
-  while (lo <= hi){
-    const mid = (lo + hi) >> 1;
-    if (tokMap[mid][3] > s){ first = mid; hi = mid - 1; } else lo = mid + 1;
-  }
-  if (first < 0 || tokMap[first][2] >= e){ clearHL(); return; }
-  let last = first;
-  while (last + 1 < tokMap.length && tokMap[last + 1][2] < e) last++;
-  showHL(tokMap[first][0], tokMap[last][1]);
-}
-document.addEventListener("selectionchange", syncFromOutput);
-outputEl.addEventListener("blur", clearHL);
-inputEl.addEventListener("scroll", () => { backdrop.scrollTop = inputEl.scrollTop; });
-inputEl.addEventListener("input", clearHL);
-
-// ---- preview font size (output box only) ----
-let outSize = 18;
-try{ const v = parseInt(localStorage.getItem("previewSize"), 10); if (v >= 10 && v <= 72) outSize = v; }catch(err){}
-function applySize(){
-  outputEl.style.fontSize = outSize + "px";
-  $("sizeval").textContent = outSize + "px";
-  try{ localStorage.setItem("previewSize", String(outSize)); }catch(err){}
-}
-$("smaller").addEventListener("click", () => { if (outSize > 10){ outSize -= 2; applySize(); } });
-$("bigger").addEventListener("click", () => { if (outSize < 72){ outSize += 2; applySize(); } });
-applySize();
-
-// ---- preview font switch: "current" (installed Preeti) or bundled Kantipur ----
-async function kantipurLoaded(){
-  try{
-    const faces = await document.fonts.load('20px KantipurWeb', 'abc');
-    return faces.length > 0 && faces.every(f => f.status === "loaded");
-  }catch(err){ return false; }
-}
-const ENGLISH_PLACEHOLDER = outputEl.placeholder;
-// Nepali placeholder, converted with the same code as the main text so Kantipur draws it as Nepali
-const KANTIPUR_PLACEHOLDER = preprocess("यहाँ प्रिटी टेक्स्ट देखिनेछ").split(" ").map(convertWord).join(" ");
-async function setFont(mode, save){
-  outputEl.setAttribute("data-font", mode);
-  outputEl.placeholder = mode === "kantipur" ? KANTIPUR_PLACEHOLDER : ENGLISH_PLACEHOLDER;
-  const warn = $("fontwarn");
-  warn.textContent = "";
-  if (mode === "kantipur" && !(await kantipurLoaded())){
-    warn.textContent = "Could not load \"Kantipur Regular.ttf\". It must be in the same folder as this page (same file name, same capitalisation).";
-  }
-  if (save){ try{ localStorage.setItem("previewFont", mode); }catch(err){} }
-}
-document.querySelectorAll('input[name="pf"]').forEach(r => {
-  r.addEventListener("change", () => { if (r.checked) setFont(r.value, true); });
-});
-(function(){
-  let m = null;
-  try{ m = localStorage.getItem("previewFont"); }catch(err){}
-  if (m === "kantipur"){
-    document.querySelector('input[name="pf"][value="kantipur"]').checked = true;
-    setFont("kantipur", false);
-  }
+  return {
+    convert:function(text){
+      if(text==='') return '';
+      return preprocess(text).split(/(\s+)/).map(function(tok){
+        return (tok===''||/^\s+$/.test(tok))?tok:convertWord(tok);
+      }).join('');
+    },
+    placeholder:function(text){return preprocess(text).split(' ').map(convertWord).join(' ');}
+  };
 })();
 
-$("clear").addEventListener("click", () => { inputEl.value = ""; fileName = "preeti"; run(); inputEl.focus(); });
-$("sample").addEventListener("click", () => {
-  inputEl.value = "नेपालको केन्द्रीय बैंकले आफ्नो नीति घोषणा गर्‍यो ।\nजनसङ्ख्याले महत्त्वपूर्ण भूमिका खेल्छ। उद्घाटन भक्तका हृदयका कट्ठा।\n'राष्ट्रवाद'को, 'गोरा', थाकेको/गलेको - २०८०/८१\n(निर्वाचन विशेष)";
-  run();
-});
+</script>
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id)};
+  var inp=$('in'), out=$('out'), smart=$('smart'), status=$('status');
 
-$("file").addEventListener("change", async e => {
-  const f = e.target.files[0];
-  if (!f) return;
-  fileName = f.name.replace(/\.[^.]+$/, "");
-  const buf = await f.arrayBuffer();
-  const bytes = new Uint8Array(buf);
-  let enc = "utf-8";
-  if (bytes[0] === 0xFF && bytes[1] === 0xFE) enc = "utf-16le";
-  else if (bytes[0] === 0xFE && bytes[1] === 0xFF) enc = "utf-16be";
-  inputEl.value = new TextDecoder(enc).decode(buf);   // strips a UTF-8 BOM
-  e.target.value = "";
-  run();
-});
+  var kant=$('kant'), spell=$('spell'), warn=$('fontwarn'), plain=out.placeholder;
+  var mirror=$('mirror'), spellrow=$('spellrow'), spellinfo=$('spellinfo');
+  var kantPlaceholder=Kantipur.placeholder('\u0928\u092E\u0938\u094D\u0924\u0947, \u092E\u0947\u0930\u094B \u0928\u093E\u092E \u0930\u093E\u092E \u0939\u094B \u0964');
 
-$("copy").addEventListener("click", async () => {
-  const t = outputEl.value;
-  if (!t) return;
-  try {
-    await navigator.clipboard.writeText(t);
-  } catch (err) {
-    outputEl.focus(); outputEl.select(); document.execCommand("copy");
+  // ---- spell check -------------------------------------------------------
+  // eligible.txt holds Kantipur-encoded words, one per line. Every Devanagari
+  // word is converted with the same Kantipur logic and looked up in that list,
+  // so the check works whether or not the Kantipur display is switched on.
+  var dict=null, dictFrom='', dictState='idle', missCount=0, missKeys=[], markEls=[];
+  var RUN=/[\u0900-\u0963\u0971-\u097F\u200C\u200D]+/g, LETTER=/[\u0904-\u0939\u0958-\u095F]/;
+
+  function decode(buf){
+    var b=new Uint8Array(buf);
+    if(b[0]===0xFF&&b[1]===0xFE) return new TextDecoder('utf-16le').decode(buf);
+    if(b[0]===0xFE&&b[1]===0xFF) return new TextDecoder('utf-16be').decode(buf);
+    try{return new TextDecoder('utf-8',{fatal:true}).decode(buf)}
+    catch(e){return new TextDecoder('windows-1252').decode(buf)}
   }
-  const b = $("copy"), old = b.textContent;
-  b.textContent = "Copied!";
-  setTimeout(() => { b.textContent = old; }, 1200);
-});
+  function parseDict(text){
+    var set=new Set();
+    text.split(/\r?\n/).forEach(function(l){l=l.trim(); if(l) set.add(l)});
+    return set;
+  }
+  // Saved copy of the word list. IndexedDB, not localStorage: the list has
+  // 345,766 words and localStorage is too small (and too slow) for that.
+  function kv(mode,fn){
+    return new Promise(function(res,rej){
+      if(typeof indexedDB==='undefined') return rej(new Error('no indexedDB'));
+      var o=indexedDB.open('nepaliUnicodeConverter',1);
+      o.onupgradeneeded=function(){o.result.createObjectStore('kv')};
+      o.onerror=function(){rej(o.error)};
+      o.onsuccess=function(){
+        var db=o.result, tx=db.transaction('kv',mode), q=fn(tx.objectStore('kv'));
+        tx.oncomplete=function(){db.close();res(q.result)};
+        tx.onerror=tx.onabort=function(){db.close();rej(tx.error)};
+      };
+    });
+  }
+  function saveDict(text){return kv('readwrite',function(s){return s.put(text,'eligible')}).catch(function(){})}
+  function loadSaved(){return kv('readonly',function(s){return s.get('eligible')}).catch(function(){return null})}
 
-$("download").addEventListener("click", () => {
-  const t = outputEl.value;
-  if (!t) return;
-  const blob = new Blob([t], { type: "text/plain;charset=utf-8" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = fileName + "_preeti.txt";
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
-});
+  // ---- suggestions (closest dictionary words, grouped by length) ----
+  var byLen=null, sugCache=new Map();
+  var ROWS=[new Int32Array(64),new Int32Array(64),new Int32Array(64)];
+  function buildIndex(set){
+    byLen=new Map(); sugCache=new Map();
+    set.forEach(function(w){var a=byLen.get(w.length); if(!a) byLen.set(w.length,a=[]); a.push(w)});
+  }
+  // Edit distance (insert, delete, replace, swap two neighbours); gives up once it must exceed `max`.
+  function osa(a,b,max){
+    var n=a.length, m=b.length;
+    if(n-m>max||m-n>max) return max+1;
+    var r0=ROWS[0], r1=ROWS[1], r2=ROWS[2], i, j, t, prevBest=0;
+    for(j=0;j<=m;j++) r1[j]=j;
+    for(i=1;i<=n;i++){
+      var ai=a.charCodeAt(i-1), best=r0[0]=i;
+      for(j=1;j<=m;j++){
+        var bj=b.charCodeAt(j-1), v=r1[j-1]+(ai===bj?0:1), x=r1[j]+1, y=r0[j-1]+1;
+        if(x<v) v=x; if(y<v) v=y;
+        if(i>1&&j>1&&ai===b.charCodeAt(j-2)&&a.charCodeAt(i-2)===bj&&r2[j-2]+1<v) v=r2[j-2]+1;
+        r0[j]=v; if(v<best) best=v;
+      }
+      if(i>1&&best>max&&prevBest>max) return max+1;   // a swap can skip one row, so look at two
+      prevBest=best; t=r2; r2=r1; r1=r0; r0=t;
+    }
+    return r1[m];
+  }
+  function suggest(key){
+    var hit=sugCache.get(key); if(hit) return hit;
+    var L=key.length, max=L<=3?1:2, res=[];
+    if(byLen&&L<=30){
+      for(var l=L-max;l<=L+max;l++){
+        var arr=byLen.get(l); if(!arr) continue;
+        for(var i=0;i<arr.length;i++){
+          var w=arr[i], d=osa(key,w,max);
+          if(d>max) continue;
+          var p=0, s=0, k=Math.min(L,w.length);
+          while(p<k&&key.charCodeAt(p)===w.charCodeAt(p)) p++;
+          while(s<k&&key.charCodeAt(L-1-s)===w.charCodeAt(w.length-1-s)) s++;
+          res.push({w:w,d:d,p:p,s:s,l:Math.abs(w.length-L)});
+        }
+      }
+      res.sort(function(x,y){return x.d-y.d||y.p-x.p||y.s-x.s||x.l-y.l||(x.w<y.w?-1:x.w>y.w?1:0)});
+    }
+    var out=res.slice(0,8).map(function(r){return r.w});
+    sugCache.set(key,out); return out;
+  }
+
+  function useDict(text,from,save){
+    var set=parseDict(text);
+    if(!set.size){dictState='empty';convert();return false}
+    dict=set; dictFrom=from; dictState='ready';
+    buildIndex(set);
+    if(save) saveDict(text);
+    convert(); return true;
+  }
+  function autoLoad(){
+    if(dict||dictState==='loading') return;
+    dictState='loading'; convert();
+    var req=(typeof fetch==='function')?fetch('eligible.txt',{cache:'no-cache'}).then(function(r){
+      if(!r.ok) throw new Error('http '+r.status); return r.arrayBuffer();
+    }):Promise.reject(new Error('no fetch'));
+    req.then(function(buf){
+      if(!useDict(decode(buf),'eligible.txt',true)) throw new Error('empty');
+    }).catch(function(){
+      // Browsers usually refuse to read files next to a page opened from disk (file://).
+      loadSaved().then(function(saved){
+        if(!(saved&&useDict(saved,'saved copy',false))){dictState='failed';convert();}
+      });
+    });
+  }
+  $('dictbtn').addEventListener('click',function(){$('dictfile').click()});
+  $('dictfile').addEventListener('change',function(e){
+    var f=e.target.files[0]; if(!f) return;
+    f.arrayBuffer().then(function(buf){
+      if(!useDict(decode(buf),f.name,true)) spellinfo.textContent='That file has no words in it.';
+    });
+    e.target.value='';
+  });
+
+  function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+  // Kantipur form of the first word in `tok` that is not in the dictionary ('' if all are known).
+  function missingKey(tok){
+    var runs=tok.match(RUN); if(!runs) return '';
+    for(var i=0;i<runs.length;i++){
+      if(!LETTER.test(runs[i])) continue;
+      var k=Kantipur.convert(runs[i]);
+      if(!dict.has(k)) return k;
+    }
+    return '';
+  }
+  function syncMirror(){
+    // match the wrapping width of the textarea (its scrollbar, if any, narrows the text area)
+    var sb=Math.max(0,out.offsetWidth-out.clientWidth-2);
+    mirror.style.paddingRight=(12+sb)+'px';
+    mirror.scrollTop=out.scrollTop;
+  }
+  function paintSpell(uni){
+    var on=spell.checked;
+    spellrow.hidden=!on;
+    closeTip(); missCount=0; missKeys=[]; markEls=[];
+    if(on&&dict){
+      var html='';
+      uni.split(/(\s+)/).forEach(function(tok){
+        if(tok==='') return;
+        if(/^\s+$/.test(tok)){html+=tok;return}
+        var shown=kant.checked?Kantipur.convert(tok):tok, key=missingKey(tok);
+        if(key){missCount++;html+='<mark data-i="'+(missKeys.push(key)-1)+'">'+esc(shown)+'</mark>'}
+        else html+=esc(shown);
+      });
+      mirror.innerHTML=html+'\n';
+      markEls=mirror.querySelectorAll('mark');
+    } else mirror.textContent='';
+    if(!markEls.length) out.style.cursor='';
+    if(on){
+      spellinfo.textContent=
+        dictState==='ready'?'Dictionary: '+dict.size.toLocaleString()+' words ('+dictFrom+') \u00B7 '+missCount.toLocaleString()+' not found'+(missCount?'. Hover or click an underlined word for suggestions.':''):
+        dictState==='loading'?'Loading eligible.txt\u2026':
+        dictState==='empty'?'eligible.txt has no words in it.':
+        'Could not open eligible.txt automatically (browsers block this for pages opened from disk). Choose the file once and it will be remembered.';
+    }
+    syncMirror();
+  }
+  out.addEventListener('scroll',syncMirror);
+  if(typeof ResizeObserver==='function') new ResizeObserver(syncMirror).observe(out);
+  spell.addEventListener('change',function(){if(spell.checked) autoLoad(); convert();});
+
+  // ---- suggestion popup (hover or click an underlined word) ----
+  // The textarea keeps all its normal behaviour (selecting, double-click...). To know which
+  // underlined word is under the pointer, the page measures where each underline sits
+  // (the mirror div sits exactly on top of the textarea, with the same font and padding).
+  var tip=$('tip'), tipHead=$('tiphead'), tipList=$('tiplist'), tipNote=$('tipnote');
+  var hoverMark=null, hoverT=0, hideT=0, pinned=false, raf=0, pt=null;
+
+  function fontCheck(){
+    return (document.fonts&&document.fonts.load)?document.fonts.load('20px KantipurWeb','abc').then(function(f){
+      return f.length>0&&f.every(function(x){return x.status==='loaded'});
+    },function(){return false}):Promise.resolve(false);
+  }
+  function copyText(text,ok,fail){
+    function fb(){
+      var t=document.createElement('textarea'); t.value=text; t.style.cssText='position:fixed;opacity:0';
+      document.body.appendChild(t); t.select();
+      var done=false; try{done=document.execCommand('copy')}catch(e){}
+      document.body.removeChild(t); (done?ok:fail)();
+    }
+    if(navigator.clipboard&&window.isSecureContext) navigator.clipboard.writeText(text).then(ok,fb); else fb();
+  }
+  function markAt(x,y){
+    var n=markEls.length; if(!n) return null;
+    var lo=0, hi=n-1;                         // underlines are in reading order: binary search by line
+    while(lo<hi){
+      var mid=(lo+hi)>>1, r0=markEls[mid].getClientRects()[0];
+      if(r0&&r0.bottom<y-2) lo=mid+1; else hi=mid;
+    }
+    for(var i=Math.max(0,lo-2);i<n;i++){
+      var rs=markEls[i].getClientRects();
+      if(rs[0]&&rs[0].top>y+3) break;
+      for(var j=0;j<rs.length;j++){
+        var r=rs[j];
+        if(x>=r.left-1&&x<=r.right+1&&y>=r.top-3&&y<=r.bottom+3) return markEls[i];
+      }
+    }
+    return null;
+  }
+  function closeTip(){clearTimeout(hoverT);clearTimeout(hideT);tip.hidden=true;pinned=false}
+  function scheduleHide(){clearTimeout(hideT);hideT=setTimeout(closeTip,250)}
+  function placeTip(m){
+    var r=m.getClientRects()[0]; if(!r){closeTip();return}
+    var w=tip.offsetWidth, h=tip.offsetHeight, vw=document.documentElement.clientWidth, vh=window.innerHeight;
+    var left=Math.max(8,Math.min(r.left,vw-w-8)), top=r.bottom+6;
+    if(top+h>vh-8&&r.top-h-6>8) top=r.top-h-6;
+    tip.style.left=left+'px'; tip.style.top=top+'px';
+  }
+  function openTip(m,pin){
+    if(!pin&&pinned&&!tip.hidden) return;     // hovering never replaces a popup the user clicked open
+    clearTimeout(hideT);
+    var list=suggest(missKeys[+m.getAttribute('data-i')]);
+    tipList.textContent='';
+    list.forEach(function(w){
+      var b=document.createElement('button'); b.type='button'; b.textContent=w;
+      b.addEventListener('click',function(){copyText(w,function(){say('Copied suggestion')},function(){say('Could not copy')});closeTip()});
+      tipList.appendChild(b);
+    });
+    tipHead.textContent=list.length?'Not in the dictionary. Closest words (click one to copy it):':'Not in the dictionary, and no close match was found.';
+    tipNote.textContent='';
+    tip.hidden=false; pinned=!!pin;
+    placeTip(m);
+    if(list.length) fontCheck().then(function(ok){
+      if(!ok&&!tip.hidden){tipNote.textContent='"Kantipur Regular.ttf" was not found, so these words appear as encoded text.';placeTip(m)}
+    });
+  }
+  function onMove(){
+    raf=0;
+    var m=pt?markAt(pt[0],pt[1]):null, cur=m?'pointer':'';
+    if(out.style.cursor!==cur) out.style.cursor=cur;
+    if(m){
+      clearTimeout(hideT);
+      if(m!==hoverMark){hoverMark=m;clearTimeout(hoverT);hoverT=setTimeout(function(){openTip(m,false)},250)}
+    } else {
+      hoverMark=null; clearTimeout(hoverT);
+      if(!pinned&&!tip.hidden) scheduleHide();
+    }
+  }
+  out.addEventListener('mousemove',function(e){pt=[e.clientX,e.clientY]; if(!raf) raf=requestAnimationFrame(onMove)});
+  out.addEventListener('mouseleave',function(){hoverMark=null;clearTimeout(hoverT);if(!pinned&&!tip.hidden) scheduleHide()});
+  out.addEventListener('click',function(e){
+    clearTimeout(hoverT);
+    var m=markAt(e.clientX,e.clientY); if(m) openTip(m,true);
+  });
+  tip.addEventListener('mouseenter',function(){clearTimeout(hideT)});
+  tip.addEventListener('mouseleave',function(){if(!pinned) scheduleHide()});
+  document.addEventListener('mousedown',function(e){if(!tip.hidden&&!tip.contains(e.target)) closeTip()});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape') closeTip()});
+  window.addEventListener('scroll',function(e){if(e.target!==tip) closeTip()},true);
+
+  function convert(){
+    // the converter appends one space after every word; drop the last one so output mirrors input
+    var uni=inp.value?NepaliUnicode.toNepali(inp.value,{smart:smart.checked}).replace(/ $/,''):'';
+    out.value=kant.checked?Kantipur.convert(uni):uni;
+    paintSpell(uni);
+    var n=inp.value.length;
+    status.textContent=n?n+' character'+(n===1?'':'s'):'';
+  }
+
+  // Kantipur output is legacy-encoded text: it only reads as Nepali in the Kantipur font.
+  function setFont(){
+    var on=kant.checked;
+    out.setAttribute('data-font',on?'kantipur':'unicode');
+    mirror.setAttribute('data-font',on?'kantipur':'unicode');
+    out.placeholder=on?kantPlaceholder:plain;
+    warn.textContent='';
+    if(on){
+      fontCheck().then(function(loaded){
+        if(!loaded&&kant.checked) warn.textContent='Could not load "Kantipur Regular.ttf". It must be in the same folder as this page, with the same file name and capitalisation.';
+      });
+    }
+    convert();
+  }
+  kant.addEventListener('change',setFont);
+
+  inp.addEventListener('input',convert);
+  smart.addEventListener('change',convert);
+
+  $('clear').addEventListener('click',function(){
+    if(inp.value.length>=30 && !confirm('Clear everything you typed?')) return;
+    inp.value=''; convert(); inp.focus();
+  });
+
+  var flash;
+  function say(msg){status.textContent=msg;clearTimeout(flash);flash=setTimeout(convert,1600)}
+  $('copy').addEventListener('click',function(){
+    if(!out.value){say('Nothing to copy yet');return}
+    copyText(out.value,function(){say('Copied')},function(){out.focus();out.select();say('Press Ctrl+C to copy')});
+  });
+
+  // Typing guide. Every Devanagari result is produced by the converter itself,
+  // so what the guide shows is exactly what typing it will give.
+  var guide=[
+    {h:'Letters where upper and lower case differ',
+     p:'Capitals give the harder sounds. For every other letter, case makes no difference.',
+     items:['ta','Ta','tha','Tha','da','Da','dha','Dha','na','Na','sha','Sha']},
+    {h:'Special characters',
+     items:[['pri^','ri^ : ra sign, as in \u092A\u094D\u0930\u093F'],['garrya','rr : as in \u0917\u0930\u094D\u200D\u092F'],
+            ['rri'],['rree'],['yna'],['chha'],['kshetra','ksha'],['gyaan','gya'],
+            ['sa*bidhaan','* : anusvara'],['maa**','** : chandrabindu'],['om']]},
+    {h:'Keep English words',
+     p:'Put any English text inside curly braces { } and it stays as typed.',
+     items:[['yo {mobile} mero ho']]},
+    {h:'Separate letters with a slash',
+     p:'If a letter joins the one before it by mistake, put / between them. The slash is not shown.',
+     items:[['pratishatko'],['pratishat/ko'],['sagarmaathaa'],['sagar/maathaa']]},
+    {h:'Keep the final halant',
+     p:'Smart mode drops the halant at the end of a word. Add a backslash \\ to keep it.',
+     items:[['bas'],['bas\\']]},
+    {h:'Example words',
+     items:['namaskaar','dhanyawaad','sa*vidhaan','sa\\watantrataa','sa/mjh/naa','chamatkaar','kaaThamaaDau*','nepaali yunikoD','mero desh Nepal ho']}
+  ];
+  var root=$('guide');
+  function add(text){
+    inp.value+=(inp.value&&!/\s$/.test(inp.value)?' ':'')+text; convert(); inp.focus();
+  }
+  guide.forEach(function(g){
+    var h=document.createElement('h3'); h.textContent=g.h; root.appendChild(h);
+    if(g.p){var p=document.createElement('p'); p.textContent=g.p; root.appendChild(p)}
+    var grid=document.createElement('div'); grid.className='ref';
+    g.items.forEach(function(it){
+      var roman=typeof it==='string'?it:it[0], note=typeof it==='string'?'':(it[1]||'');
+      var b=document.createElement('button'); b.type='button';
+      var left=document.createElement('span');
+      var r=document.createElement('span'); r.className='r'; r.textContent=roman; left.appendChild(r);
+      if(note){var n=document.createElement('span'); n.className='n'; n.textContent=note; left.appendChild(n)}
+      var d=document.createElement('span'); d.className='d';
+      d.textContent=NepaliUnicode.toNepali(roman,{smart:true}).trim();
+      b.appendChild(left); b.appendChild(d);
+      b.addEventListener('click',function(){add(roman)});
+      grid.appendChild(b);
+    });
+    root.appendChild(grid);
+  });
+  convert();
+})();
 </script>
 </body>
 </html>
