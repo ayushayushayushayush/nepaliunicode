@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unicode to Preeti Converter</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#ffffff; --text:#1d2330; --muted:#667085; --line:#d9dde5;
+    --accent:#2457d6; --accent-text:#ffffff; --ok:#1a7f4b; --warn:#b54708;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14171d; --card:#1d222b; --text:#e8ebf1; --muted:#9aa4b5; --line:#343b48;
+      --accent:#6b93ff; --accent-text:#0d1220; --ok:#4cc58a; --warn:#f0a35e;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Devanagari","Nirmala UI",sans-serif;
+    padding:24px 16px 48px;
+  }
+  .wrap{max-width:1100px;margin:0 auto}
+  h1{font-size:1.5rem;margin:0 0 4px}
+  p.sub{margin:0 0 20px;color:var(--muted)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media (max-width:760px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+  .card h2{font-size:.95rem;margin:0;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+  textarea{
+    width:100%;min-height:340px;resize:vertical;padding:12px;border:1px solid var(--line);border-radius:8px;
+    background:transparent;color:var(--text);font-size:1.15rem;line-height:1.6;
+  }
+  #input{font-family:"Noto Sans Devanagari","Nirmala UI","Mangal",system-ui,sans-serif}
+
+  /* highlight backdrop behind the Unicode input */
+  .hl{position:relative;display:flex}
+  .hl textarea{position:relative;z-index:1;background:transparent;flex:1;display:block;overflow-y:scroll}
+  #backdrop{
+    position:absolute;inset:0;margin:0;padding:12px;border:1px solid transparent;border-radius:8px;
+    white-space:pre-wrap;overflow-wrap:break-word;overflow-y:scroll;pointer-events:none;
+    color:transparent;font-size:1.15rem;line-height:1.6;
+    font-family:"Noto Sans Devanagari","Nirmala UI","Mangal",system-ui,sans-serif;
+    scrollbar-color:transparent transparent;
+  }
+  #backdrop mark{color:transparent;background:color-mix(in srgb, var(--accent) 35%, transparent);border-radius:3px}
+
+  @font-face{
+    font-family:"KantipurWeb";
+    src:url("Kantipur%20Regular.ttf") format("truetype");
+    font-display:swap;
+  }
+  #output[data-font="current"]{font-family:Preeti,"Preeti Normal",monospace}
+  #output[data-font="kantipur"]{font-family:"KantipurWeb",monospace}
+  /* in "current look" the placeholder stays plain English; in Kantipur mode it is converted Nepali and uses the Kantipur font */
+  #output[data-font="current"]::placeholder{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg label{padding:6px 12px;font-size:.85rem;cursor:pointer;color:var(--text);user-select:none}
+  .seg input{display:none}
+  .seg input:checked + span{font-weight:700;color:var(--accent)}
+  .seg label:has(input:checked){background:color-mix(in srgb, var(--accent) 14%, transparent)}
+  .seg label + label{border-left:1px solid var(--line)}
+  .head{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+  .sizebtns{display:inline-flex;align-items:center;gap:4px}
+  .sizebtns button{padding:4px 10px;font-weight:700;line-height:1.2}
+  .sizebtns span{font-size:.8rem;color:var(--muted);min-width:2.6em;text-align:center}
+  .fontwarn{font-size:.82rem;color:var(--warn);min-height:1.2em}
+  textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  button,label.btn{
+    font:inherit;font-size:.92rem;padding:8px 14px;border-radius:8px;border:1px solid var(--line);
+    background:var(--card);color:var(--text);cursor:pointer;
+  }
+  button:hover,label.btn:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);color:var(--accent-text);border-color:var(--accent);font-weight:600}
+  input[type=file]{display:none}
+  .status{font-size:.85rem;color:var(--muted);min-height:1.3em}
+  .bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;visibility:hidden}
+  .bar.on{visibility:visible}
+  .bar>div{height:100%;width:0;background:var(--accent);transition:width .08s linear}
+  .note{margin-top:16px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--card);font-size:.9rem;color:var(--muted)}
+  .note b{color:var(--text)}
+  .note ol{margin:6px 0 0 18px;padding:0}
+  footer{margin-top:18px;font-size:.8rem;color:var(--muted)}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="grid">
+    <div class="card">
+      <h2>Nepali Unicode</h2>
+      <div class="hl">
+        <div id="backdrop" aria-hidden="true"></div>
+        <textarea id="input" placeholder="यहाँ नेपाली युनिकोड टेक्स्ट टाइप वा पेस्ट गर्नुहोस्..." spellcheck="false"></textarea>
+      </div>
+      <div class="row">
+        <label class="btn" for="file">Open .txt file</label>
+        <input type="file" id="file" accept=".txt,text/plain">
+        <button id="sample" type="button">Sample</button>
+        <button id="clear" type="button">Clear</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="head">
+        <h2>Preeti</h2>
+        <div class="seg" role="radiogroup" aria-label="Preview font">
+          <label title="Uses the Preeti font if it is installed on your computer"><input type="radio" name="pf" value="current" checked><span>Current look</span></label>
+          <label title="Uses Kantipur Regular.ttf from this website"><input type="radio" name="pf" value="kantipur"><span>Kantipur font</span></label>
+        </div>
+        <div class="sizebtns" aria-label="Preview font size">
+          <button id="smaller" type="button" title="Decrease font size">A&minus;</button>
+          <span id="sizeval">18px</span>
+          <button id="bigger" type="button" title="Increase font size">A+</button>
+        </div>
+      </div>
+      <textarea id="output" data-font="current" readonly spellcheck="false" placeholder="Preeti text appears here"></textarea>
+      <div class="fontwarn" id="fontwarn"></div>
+      <div class="row">
+        <button id="copy" class="primary" type="button">Copy</button>
+        <button id="download" type="button">Download .txt</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="bar" id="bar"><div id="barfill"></div></div>
+  <div class="status" id="status"></div>
+
+</div>
+
+<script>
+// ==== CORE ====
+const ARRAY_ONE = ["‘", "?", "क़", "ख़", "ग़", "ज़", "ड़", "ढ़", "फ़", "ॐ", "ऽ", "।", "m'", "m]", "mfF", "mF", "०", "१", "२", "३", "४", "५", "६", "७", "८", "९", "फ्र", "झ", "फ", "क्त", "क्र", "ल", "ज्ञ्", "द्घ", "ज्ञ", "द्द", "द्ध", "श्र", "रु", "द्य", "क्ष्", "क्ष", "त्त", "द्म", "त्र", "ध्र", "ङ्घ", "ड्ड", "द्र", "ट्ट", "ड्ढ", "ठ्ठ", "रू", "हृ", "ङ्ग", "त्र", "ङ्क", "ङ्ख", "ट्ठ", "द्व", "ट्र", "ठ्र", "ड्र", "ढ्र", "्र", "ड़", "ढ़", "क्", "क", "ख्", "ख", "ग्", "ग", "घ्", "घ", "ङ", "च्", "च", "छ", "ज्", "ज", "झ्", "झ", "ञ्", "ञ", "ट", "ठ", "ड", "ढ", "ण्", "ण", "त्", "त", "थ्", "थ", "द", "ध्", "ध", "न्", "न", "प्", "प", "फ्", "ब्", "ब", "भ्", "भ", "म्", "म", "य", "र", "ल्", "ल", "व्", "व", "श्", "श", "ष्", "ष", "स्", "स", "ह्", "ह", "्य", "ऑ", "ऑ", "औ", "ओ", "आ", "अ", "ई", "इ", "ऊ", "उ", "ऋ", "ऐ", "ए", "ॉ", "ू", "ु", "ं", "ा", "ृ", "्", "े", "ै", "ँ", "ी", "ः", "ो", "ौ"];
+const ARRAY_TWO = ["…", "<", "क़", "ख़", "ग़", "ज़", "ड़", "ढ़", "फ़", "ç", "˜", ".", "'m", "]m", "Fmf", "Fm", ")", "!", "@", "#", "$", "%", "^", "&", "*", "(", "k|m", "em", "km", "St", "qm", "n", "¡", "b\\3", "1", "2", "4", ">", "?", "B", "I", "If", "Q", "ß", "q", "„", "‹", "•", "ı", "§", "°", "¶", "¿", "X", "Ë", "Ì", "Í", "Î", "\uf002", "å", "6«", "7«", "8«", "9«", "|", "8Þ", "9Þ", "S", "s", "V", "v", "U", "u", "£", "3", "ª", "R", "r", "5", "H", "h", "‰", "´", "~", "`", "6", "7", "8", "9", "0", "0f", "T", "t", "Y", "y", "b", "W", "w", "G", "g", "K", "k", "Ï", "A", "a", "E", "e", "D", "d", "o", "/", "N", "n", "J", "j", "Z", "z", "i", "if", ":", ";", "X", "x", "Ø", "cf‘", "c‘f", "cf}", "cf]", "cf", "c", "O{", "O", "pm", "p", "C", "P]", "P", "f‘", "\"", "'", "+", "f", "[", "\\", "]", "}", "“", "L", "M", "f]", "f}"];
+const MATRAS = "ािीुूृेैोौं:ँॅ";
+const AFTER_MATRAS = "ािीुूृेैोौंःँॅॉ";
+const HALANT = "\u094d";
+const REPH = "\u0930\u094d";
+const CONS = "\u0915-\u0939\u0958-\u095f";
+
+function isConsonant(ch){
+  return ch !== "" && ((ch >= "\u0915" && ch <= "\u0939") || (ch >= "\u0958" && ch <= "\u095f"));
+}
+function charAt(s, i){ return (i >= 0 && i < s.length) ? s[i] : ""; }
+function isMatra(ch){ return ch === "" || MATRAS.indexOf(ch) !== -1; }
+function replaceFirst(s, a, b){
+  const i = s.indexOf(a);
+  return i < 0 ? s : s.slice(0, i) + b + s.slice(i + a.length);
+}
+
+const FINAL_HALANT = new RegExp("([" + CONS + "])\u094d(?![" + CONS + "])", "g");
+const TTA_HALF = new RegExp("\u0924\u094d\u0924\u094d(?=[" + CONS + "])", "g");
+// र् + ZWJ + य (गर्‍यो, भर्‍यो) is the single Preeti glyph ¥. Must run before the reph logic,
+// otherwise the ZWJ stops the reph from finding its consonant.
+const RA_ZWJ_YA = /\u0930\u094d\u200d(?=\u092f)/g;
+function glyphFor(key){ return ARRAY_TWO[ARRAY_ONE.indexOf(key)]; }
+const HALF_FIRST = [
+  [/\u0932\u094d/g, glyphFor("\u0932\u094d")],           // ल्
+  [/\u092b\u094d(?!\u0930)/g, glyphFor("\u092b\u094d")], // फ् (not फ्र)
+  [/\u091d\u094d/g, glyphFor("\u091d\u094d")]            // झ्
+];
+const M_MATRA = /(km|em|qm)(['"\]}]+)/g;
+const PAIRS = [];
+for (let i = 0; i < ARRAY_ONE.length; i++){
+  const a = ARRAY_ONE[i], b = ARRAY_TWO[i];
+  if (a === "" || a === b) continue;
+  PAIRS.push([a, b]);
+}
+
+function convertCore(text){
+  if (text === "") return text;
+  let s = text;
+
+  // punctuation (before the table, which itself outputs "/", "(" , ")" and "!")
+  s = s.split("/").join("\u00f7");        // / -> ÷
+  s = s.split("!").join("\u03c0");        // ! -> π   (must stay before the table, which outputs "!" for १)
+  s = s.split("-").join("\u2013");        // hyphen -> en dash
+  s = s.split("(").join("-");             // ( -> -   (must stay after the hyphen line)
+  s = s.split(")").join("_");             // ) -> _
+  s = s.split(".").join("=");             // . -> =   (must stay before the table, which outputs "." for the danda)
+  s = s.split("\u2019").join("\u00da");    // closing quote -> Ú
+  s = s.replace(RA_ZWJ_YA, () => "\u00a5"); // र्‍य -> ¥ (then य and the matra follow normally)
+
+  // move the short-i matra in front of its consonant cluster
+  let pos = s.indexOf("\u093f");
+  let guard = 0;
+  while (pos !== -1 && guard < 100000){
+    guard++;
+    const left = charAt(s, pos - 1);
+    s = replaceFirst(s, left + "\u093f", "l" + left);
+    pos -= 1;
+    while (charAt(s, pos - 1) === HALANT && pos !== 0){
+      const chunk = charAt(s, pos - 2) + HALANT;
+      s = replaceFirst(s, chunk + "l", "l" + chunk);
+      pos -= 2;
+    }
+    pos = s.indexOf("\u093f");
+  }
+
+  // chandrabindu goes before the u / uu sign
+  s = s.split("\u0941\u0901").join("\u0901\u0941").split("\u0942\u0901").join("\u0901\u0942");
+
+  // reph: move it to the end of its syllable
+  s += "  ";
+  let start = 0;
+  let halfR = s.indexOf(REPH, start);
+  guard = 0;
+  while (halfR !== -1 && guard < 100000){
+    guard++;
+    let z = halfR + 2;
+    let ch = charAt(s, z);
+    while ((isMatra(ch) || ch === "l") && z < s.length){
+      z++;
+      ch = charAt(s, z);
+    }
+    if (!isConsonant(ch)){
+      start = halfR + 2;
+      halfR = s.indexOf(REPH, start);
+      continue;
+    }
+    let right = z + 1;
+    let rightCh = charAt(s, right);
+    while (rightCh === HALANT){
+      z = right + 1;
+      right = z + 1;
+      rightCh = charAt(s, right);
+    }
+    let end = z;
+    while (charAt(s, end + 1) !== "" && AFTER_MATRAS.indexOf(charAt(s, end + 1)) !== -1) end++;
+    const chunk = s.slice(halfR + 2, end + 1);
+    s = s.slice(0, halfR) + chunk + "{" + s.slice(end + 1);
+    start = halfR;
+    halfR = s.indexOf(REPH, start);
+  }
+  s = s.slice(0, -2);
+
+  // second-round fixes (before the big table)
+  s = s.replace(TTA_HALF, () => "\u0152");
+  s = s.replace(FINAL_HALANT, (m, g) => g + "\\");
+  for (const [rx, glyph] of HALF_FIRST) s = s.replace(rx, () => glyph);
+  s = s.split("\u0919\u094d\u0916\u094d").join("\u00aa\\V");
+
+  // table replacement, in order
+  for (const [a, b] of PAIRS){
+    let g = 0;
+    while (s.indexOf(a) !== -1 && g < 50){
+      g++;
+      s = s.split(a).join(b);
+    }
+  }
+  s = s.replace(M_MATRA, (m, a, b) => a[0] + b + "m");
+  return s;
+}
+
+// speed-ups for big texts: words are converted once and remembered
+const SENTINEL = "\u0000";
+const PIECE = 40;
+const cache = new Map();
+
+function convertPiece(piece){
+  let hit = cache.get(piece);
+  if (hit === undefined){
+    hit = replaceFirst(convertCore(SENTINEL + piece), SENTINEL, "");
+    cache.set(piece, hit);
+  }
+  return hit;
+}
+function cutPoints(word){
+  const cuts = [];
+  for (let i = 0; i < word.length; i++){
+    const c = word[i];
+    if (((c >= "\u0904" && c <= "\u0939") || (c >= "\u0958" && c <= "\u095f")) &&
+        !(i > 0 && "\u094d\u200c\u200d".indexOf(word[i - 1]) !== -1)) cuts.push(i);
+  }
+  return cuts;
+}
+function convertWord(word){
+  const hit = cache.get(word);
+  if (hit !== undefined) return hit;
+  if (word.length <= PIECE * 2) return convertPiece(word);
+  const out = [];
+  let start = 0;
+  for (const c of cutPoints(word)){
+    if (c - start >= PIECE){
+      out.push(convertPiece(word.slice(start, c)));
+      start = c;
+    }
+  }
+  out.push(convertPiece(word.slice(start)));
+  return out.join("");
+}
+// straight single quotes: opening after start / space / bracket / dash, else closing
+const OPEN_Q = /(^|[\s(\[{<"\u201c\u2018\u2013\u2014\/-])'/gm;
+function preprocess(text){
+  return text.replace(OPEN_Q, (m, g) => g + "\u2018").split("'").join("\u2019")
+             .split(":").join("\u0903");   // typed ":" is treated as visarga ः -> M (same length, so highlight positions stay valid)
+}
+// ==== END CORE ====
+
+// ---------------------------- interface ---------------------------------
+const $ = id => document.getElementById(id);
+const inputEl = $("input"), outputEl = $("output"), statusEl = $("status");
+const bar = $("bar"), barfill = $("barfill");
+let runId = 0, timer = null, fileName = "preeti";
+let tokMap = [];   // [inStart, inEnd, outStart, outEnd] for each word
+
+// preprocess() only swaps one character for one character, so positions in the
+// preprocessed text match positions in the original input.
+async function convertAsync(text, myRun){
+  const toks = preprocess(text).split(/(\s+)/);
+  const out = [], map = [];
+  let inPos = 0, outPos = 0;
+  const total = text.length;
+  let done = 0, last = performance.now();
+  for (let n = 0; n < toks.length; n++){
+    const tok = toks[n];
+    if (tok === "") continue;
+    if (/^\s+$/.test(tok)){
+      out.push(tok); inPos += tok.length; outPos += tok.length;
+    } else {
+      const c = convertWord(tok);
+      map.push([inPos, inPos + tok.length, outPos, outPos + c.length]);
+      out.push(c); inPos += tok.length; outPos += c.length;
+    }
+    done += tok.length;
+    if ((n & 255) === 0){
+      const now = performance.now();
+      if (now - last >= 40){
+        barfill.style.width = (100 * done / total).toFixed(1) + "%";
+        await new Promise(r => setTimeout(r, 0));
+        if (myRun !== runId) return null;       // newer input arrived
+        last = performance.now();
+      }
+    }
+  }
+  return { text: out.join(""), map };
+}
+
+async function run(){
+  const myRun = ++runId;
+  const text = inputEl.value;
+  if (text === ""){
+    outputEl.value = ""; tokMap = []; clearHL();
+    statusEl.textContent = "";
+    bar.classList.remove("on");
+    return;
+  }
+  const t0 = performance.now();
+  const big = text.length > 20000;
+  if (big){ bar.classList.add("on"); barfill.style.width = "0%"; statusEl.textContent = "Converting..."; }
+  const res = await convertAsync(text, myRun);
+  if (res === null || myRun !== runId) return;
+  outputEl.value = res.text;
+  tokMap = res.map;
+  clearHL();
+  barfill.style.width = "100%";
+  setTimeout(() => { if (myRun === runId) bar.classList.remove("on"); }, 300);
+  const words = (text.match(/\S+/g) || []).length;
+  statusEl.textContent = words.toLocaleString() + " words converted in " + ((performance.now() - t0) / 1000).toFixed(2) + " s";
+}
+function schedule(){ clearTimeout(timer); timer = setTimeout(run, 200); }
+
+inputEl.addEventListener("input", schedule);
+
+// ---- highlight the matching Unicode word when text is selected in the Preeti box ----
+const backdrop = $("backdrop");
+const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+function clearHL(){ backdrop.innerHTML = ""; }
+function showHL(s, e){
+  const t = inputEl.value;
+  backdrop.innerHTML = esc(t.slice(0, s)) + "<mark>" + esc(t.slice(s, e)) + "</mark>" + esc(t.slice(e)) + "\n";
+  const m = backdrop.querySelector("mark");
+  if (m && (m.offsetTop < inputEl.scrollTop || m.offsetTop > inputEl.scrollTop + inputEl.clientHeight - 40)){
+    inputEl.scrollTop = Math.max(0, m.offsetTop - 40);
+  }
+  backdrop.scrollTop = inputEl.scrollTop;
+}
+function syncFromOutput(){
+  if (document.activeElement !== outputEl) return;
+  const s = outputEl.selectionStart, e = outputEl.selectionEnd;
+  if (s === e || !tokMap.length){ clearHL(); return; }
+  // first word ending after s (binary search), last word starting before e
+  let lo = 0, hi = tokMap.length - 1, first = -1;
+  while (lo <= hi){
+    const mid = (lo + hi) >> 1;
+    if (tokMap[mid][3] > s){ first = mid; hi = mid - 1; } else lo = mid + 1;
+  }
+  if (first < 0 || tokMap[first][2] >= e){ clearHL(); return; }
+  let last = first;
+  while (last + 1 < tokMap.length && tokMap[last + 1][2] < e) last++;
+  showHL(tokMap[first][0], tokMap[last][1]);
+}
+document.addEventListener("selectionchange", syncFromOutput);
+outputEl.addEventListener("blur", clearHL);
+inputEl.addEventListener("scroll", () => { backdrop.scrollTop = inputEl.scrollTop; });
+inputEl.addEventListener("input", clearHL);
+
+// ---- preview font size (output box only) ----
+let outSize = 18;
+try{ const v = parseInt(localStorage.getItem("previewSize"), 10); if (v >= 10 && v <= 72) outSize = v; }catch(err){}
+function applySize(){
+  outputEl.style.fontSize = outSize + "px";
+  $("sizeval").textContent = outSize + "px";
+  try{ localStorage.setItem("previewSize", String(outSize)); }catch(err){}
+}
+$("smaller").addEventListener("click", () => { if (outSize > 10){ outSize -= 2; applySize(); } });
+$("bigger").addEventListener("click", () => { if (outSize < 72){ outSize += 2; applySize(); } });
+applySize();
+
+// ---- preview font switch: "current" (installed Preeti) or bundled Kantipur ----
+async function kantipurLoaded(){
+  try{
+    const faces = await document.fonts.load('20px KantipurWeb', 'abc');
+    return faces.length > 0 && faces.every(f => f.status === "loaded");
+  }catch(err){ return false; }
+}
+const ENGLISH_PLACEHOLDER = outputEl.placeholder;
+// Nepali placeholder, converted with the same code as the main text so Kantipur draws it as Nepali
+const KANTIPUR_PLACEHOLDER = preprocess("यहाँ प्रिटी टेक्स्ट देखिनेछ").split(" ").map(convertWord).join(" ");
+async function setFont(mode, save){
+  outputEl.setAttribute("data-font", mode);
+  outputEl.placeholder = mode === "kantipur" ? KANTIPUR_PLACEHOLDER : ENGLISH_PLACEHOLDER;
+  const warn = $("fontwarn");
+  warn.textContent = "";
+  if (mode === "kantipur" && !(await kantipurLoaded())){
+    warn.textContent = "Could not load \"Kantipur Regular.ttf\". It must be in the same folder as this page (same file name, same capitalisation).";
+  }
+  if (save){ try{ localStorage.setItem("previewFont", mode); }catch(err){} }
+}
+document.querySelectorAll('input[name="pf"]').forEach(r => {
+  r.addEventListener("change", () => { if (r.checked) setFont(r.value, true); });
+});
+(function(){
+  let m = null;
+  try{ m = localStorage.getItem("previewFont"); }catch(err){}
+  if (m === "kantipur"){
+    document.querySelector('input[name="pf"][value="kantipur"]').checked = true;
+    setFont("kantipur", false);
+  }
+})();
+
+$("clear").addEventListener("click", () => { inputEl.value = ""; fileName = "preeti"; run(); inputEl.focus(); });
+$("sample").addEventListener("click", () => {
+  inputEl.value = "नेपालको केन्द्रीय बैंकले आफ्नो नीति घोषणा गर्‍यो ।\nजनसङ्ख्याले महत्त्वपूर्ण भूमिका खेल्छ। उद्घाटन भक्तका हृदयका कट्ठा।\n'राष्ट्रवाद'को, 'गोरा', थाकेको/गलेको - २०८०/८१\n(निर्वाचन विशेष)";
+  run();
+});
+
+$("file").addEventListener("change", async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  fileName = f.name.replace(/\.[^.]+$/, "");
+  const buf = await f.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let enc = "utf-8";
+  if (bytes[0] === 0xFF && bytes[1] === 0xFE) enc = "utf-16le";
+  else if (bytes[0] === 0xFE && bytes[1] === 0xFF) enc = "utf-16be";
+  inputEl.value = new TextDecoder(enc).decode(buf);   // strips a UTF-8 BOM
+  e.target.value = "";
+  run();
+});
+
+$("copy").addEventListener("click", async () => {
+  const t = outputEl.value;
+  if (!t) return;
+  try {
+    await navigator.clipboard.writeText(t);
+  } catch (err) {
+    outputEl.focus(); outputEl.select(); document.execCommand("copy");
+  }
+  const b = $("copy"), old = b.textContent;
+  b.textContent = "Copied!";
+  setTimeout(() => { b.textContent = old; }, 1200);
+});
+
+$("download").addEventListener("click", () => {
+  const t = outputEl.value;
+  if (!t) return;
+  const blob = new Blob([t], { type: "text/plain;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = fileName + "_preeti.txt";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+});
+</script>
+</body>
+</html>
