@@ -28,6 +28,10 @@ body{background:var(--bg);color:var(--ink);font:16px/1.5 var(--latin);min-height
 .pane label,.pane .cap{font-weight:600;font-size:14px;color:var(--muted)}
 textarea{width:100%;min-height:260px;resize:vertical;border:1px solid var(--line);border-radius:6px;padding:12px;background:var(--panel);color:var(--ink);font:18px/1.6 var(--latin)}
 #out{font:22px/1.7 var(--deva);background:var(--out-bg)}
+@font-face{font-family:"KantipurWeb";src:url("Kantipur%20Regular.ttf") format("truetype");font-display:swap}
+#out[data-font="kantipur"]{font-family:"KantipurWeb",monospace;font-size:26px;line-height:1.6}
+.warn{margin:10px 0 0;color:var(--accent);font-size:14px}
+.warn:empty{display:none}
 textarea:focus,button:focus-visible,summary:focus-visible,input:focus-visible{outline:3px solid var(--focus);outline-offset:1px}
 .bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-top:14px}
 button{font:600 14px var(--latin);padding:9px 16px;border-radius:6px;border:1px solid var(--brand);background:var(--brand);color:var(--brand-ink);cursor:pointer}
@@ -69,8 +73,11 @@ summary{cursor:pointer;font-weight:600;padding:12px 0}
       <button id="copy" type="button">Copy Nepali text</button>
       <button id="clear" type="button" class="ghost">Clear</button>
       <label class="opt"><input id="smart" type="checkbox" checked> Smart converter</label>
+      <label class="opt"><input id="kant" type="checkbox"> Kantipur</label>
       <span class="stat" id="status" role="status" aria-live="polite"></span>
     </div>
+
+    <p id="fontwarn" class="warn" role="alert"></p>
 
     <details open>
       <summary>Typing guide <span class="hint">– click any example to add it to your text</span></summary>
@@ -400,16 +407,221 @@ summary{cursor:pointer;font-weight:600;padding:12px 0}
 
 </script>
 <script>
+/* Unicode -> Kantipur/Preeti legacy encoding. CORE block copied unchanged from unicode_to_kantipur_logic.htm */
+var Kantipur=(function(){
+// ==== CORE ====
+const ARRAY_ONE = ["‘", "?", "क़", "ख़", "ग़", "ज़", "ड़", "ढ़", "फ़", "ॐ", "ऽ", "।", "m'", "m]", "mfF", "mF", "०", "१", "२", "३", "४", "५", "६", "७", "८", "९", "फ्र", "झ", "फ", "क्त", "क्र", "ल", "ज्ञ्", "द्घ", "ज्ञ", "द्द", "द्ध", "श्र", "रु", "द्य", "क्ष्", "क्ष", "त्त", "द्म", "त्र", "ध्र", "ङ्घ", "ड्ड", "द्र", "ट्ट", "ड्ढ", "ठ्ठ", "रू", "हृ", "ङ्ग", "त्र", "ङ्क", "ङ्ख", "ट्ठ", "द्व", "ट्र", "ठ्र", "ड्र", "ढ्र", "्र", "ड़", "ढ़", "क्", "क", "ख्", "ख", "ग्", "ग", "घ्", "घ", "ङ", "च्", "च", "छ", "ज्", "ज", "झ्", "झ", "ञ्", "ञ", "ट", "ठ", "ड", "ढ", "ण्", "ण", "त्", "त", "थ्", "थ", "द", "ध्", "ध", "न्", "न", "प्", "प", "फ्", "ब्", "ब", "भ्", "भ", "म्", "म", "य", "र", "ल्", "ल", "व्", "व", "श्", "श", "ष्", "ष", "स्", "स", "ह्", "ह", "्य", "ऑ", "ऑ", "औ", "ओ", "आ", "अ", "ई", "इ", "ऊ", "उ", "ऋ", "ऐ", "ए", "ॉ", "ू", "ु", "ं", "ा", "ृ", "्", "े", "ै", "ँ", "ी", "ः", "ो", "ौ"];
+const ARRAY_TWO = ["…", "<", "क़", "ख़", "ग़", "ज़", "ड़", "ढ़", "फ़", "ç", "˜", ".", "'m", "]m", "Fmf", "Fm", ")", "!", "@", "#", "$", "%", "^", "&", "*", "(", "k|m", "em", "km", "St", "qm", "n", "¡", "b\\3", "1", "2", "4", ">", "?", "B", "I", "If", "Q", "ß", "q", "„", "‹", "•", "ı", "§", "°", "¶", "¿", "X", "Ë", "Ì", "Í", "Î", "\uf002", "å", "6«", "7«", "8«", "9«", "|", "8Þ", "9Þ", "S", "s", "V", "v", "U", "u", "£", "3", "ª", "R", "r", "5", "H", "h", "‰", "´", "~", "`", "6", "7", "8", "9", "0", "0f", "T", "t", "Y", "y", "b", "W", "w", "G", "g", "K", "k", "Ï", "A", "a", "E", "e", "D", "d", "o", "/", "N", "n", "J", "j", "Z", "z", "i", "if", ":", ";", "X", "x", "Ø", "cf‘", "c‘f", "cf}", "cf]", "cf", "c", "O{", "O", "pm", "p", "C", "P]", "P", "f‘", "\"", "'", "+", "f", "[", "\\", "]", "}", "“", "L", "M", "f]", "f}"];
+const MATRAS = "ािीुूृेैोौं:ँॅ";
+const AFTER_MATRAS = "ािीुूृेैोौंःँॅॉ";
+const HALANT = "\u094d";
+const REPH = "\u0930\u094d";
+const CONS = "\u0915-\u0939\u0958-\u095f";
+
+function isConsonant(ch){
+  return ch !== "" && ((ch >= "\u0915" && ch <= "\u0939") || (ch >= "\u0958" && ch <= "\u095f"));
+}
+function charAt(s, i){ return (i >= 0 && i < s.length) ? s[i] : ""; }
+function isMatra(ch){ return ch === "" || MATRAS.indexOf(ch) !== -1; }
+function replaceFirst(s, a, b){
+  const i = s.indexOf(a);
+  return i < 0 ? s : s.slice(0, i) + b + s.slice(i + a.length);
+}
+
+const FINAL_HALANT = new RegExp("([" + CONS + "])\u094d(?![" + CONS + "])", "g");
+const TTA_HALF = new RegExp("\u0924\u094d\u0924\u094d(?=[" + CONS + "])", "g");
+// र् + ZWJ + य (गर्‍यो, भर्‍यो) is the single Preeti glyph ¥. Must run before the reph logic,
+// otherwise the ZWJ stops the reph from finding its consonant.
+const RA_ZWJ_YA = /\u0930\u094d\u200d(?=\u092f)/g;
+function glyphFor(key){ return ARRAY_TWO[ARRAY_ONE.indexOf(key)]; }
+const HALF_FIRST = [
+  [/\u0932\u094d/g, glyphFor("\u0932\u094d")],           // ल्
+  [/\u092b\u094d(?!\u0930)/g, glyphFor("\u092b\u094d")], // फ् (not फ्र)
+  [/\u091d\u094d/g, glyphFor("\u091d\u094d")]            // झ्
+];
+const M_MATRA = /(km|em|qm)(['"\]}]+)/g;
+const PAIRS = [];
+for (let i = 0; i < ARRAY_ONE.length; i++){
+  const a = ARRAY_ONE[i], b = ARRAY_TWO[i];
+  if (a === "" || a === b) continue;
+  PAIRS.push([a, b]);
+}
+
+function convertCore(text){
+  if (text === "") return text;
+  let s = text;
+
+  // punctuation (before the table, which itself outputs "/", "(" , ")" and "!")
+  s = s.split("/").join("\u00f7");        // / -> ÷
+  s = s.split("!").join("\u03c0");        // ! -> π   (must stay before the table, which outputs "!" for १)
+  s = s.split("-").join("\u2013");        // hyphen -> en dash
+  s = s.split("(").join("-");             // ( -> -   (must stay after the hyphen line)
+  s = s.split(")").join("_");             // ) -> _
+  s = s.split(".").join("=");             // . -> =   (must stay before the table, which outputs "." for the danda)
+  s = s.split("\u2019").join("\u00da");    // closing quote -> Ú
+  s = s.replace(RA_ZWJ_YA, () => "\u00a5"); // र्‍य -> ¥ (then य and the matra follow normally)
+
+  // move the short-i matra in front of its consonant cluster
+  let pos = s.indexOf("\u093f");
+  let guard = 0;
+  while (pos !== -1 && guard < 100000){
+    guard++;
+    const left = charAt(s, pos - 1);
+    s = replaceFirst(s, left + "\u093f", "l" + left);
+    pos -= 1;
+    while (charAt(s, pos - 1) === HALANT && pos !== 0){
+      const chunk = charAt(s, pos - 2) + HALANT;
+      s = replaceFirst(s, chunk + "l", "l" + chunk);
+      pos -= 2;
+    }
+    pos = s.indexOf("\u093f");
+  }
+
+  // chandrabindu goes before the u / uu sign
+  s = s.split("\u0941\u0901").join("\u0901\u0941").split("\u0942\u0901").join("\u0901\u0942");
+
+  // reph: move it to the end of its syllable
+  s += "  ";
+  let start = 0;
+  let halfR = s.indexOf(REPH, start);
+  guard = 0;
+  while (halfR !== -1 && guard < 100000){
+    guard++;
+    let z = halfR + 2;
+    let ch = charAt(s, z);
+    while ((isMatra(ch) || ch === "l") && z < s.length){
+      z++;
+      ch = charAt(s, z);
+    }
+    if (!isConsonant(ch)){
+      start = halfR + 2;
+      halfR = s.indexOf(REPH, start);
+      continue;
+    }
+    let right = z + 1;
+    let rightCh = charAt(s, right);
+    while (rightCh === HALANT){
+      z = right + 1;
+      right = z + 1;
+      rightCh = charAt(s, right);
+    }
+    let end = z;
+    while (charAt(s, end + 1) !== "" && AFTER_MATRAS.indexOf(charAt(s, end + 1)) !== -1) end++;
+    const chunk = s.slice(halfR + 2, end + 1);
+    s = s.slice(0, halfR) + chunk + "{" + s.slice(end + 1);
+    start = halfR;
+    halfR = s.indexOf(REPH, start);
+  }
+  s = s.slice(0, -2);
+
+  // second-round fixes (before the big table)
+  s = s.replace(TTA_HALF, () => "\u0152");
+  s = s.replace(FINAL_HALANT, (m, g) => g + "\\");
+  for (const [rx, glyph] of HALF_FIRST) s = s.replace(rx, () => glyph);
+  s = s.split("\u0919\u094d\u0916\u094d").join("\u00aa\\V");
+
+  // table replacement, in order
+  for (const [a, b] of PAIRS){
+    let g = 0;
+    while (s.indexOf(a) !== -1 && g < 50){
+      g++;
+      s = s.split(a).join(b);
+    }
+  }
+  s = s.replace(M_MATRA, (m, a, b) => a[0] + b + "m");
+  return s;
+}
+
+// speed-ups for big texts: words are converted once and remembered
+const SENTINEL = "\u0000";
+const PIECE = 40;
+const cache = new Map();
+
+function convertPiece(piece){
+  let hit = cache.get(piece);
+  if (hit === undefined){
+    hit = replaceFirst(convertCore(SENTINEL + piece), SENTINEL, "");
+    cache.set(piece, hit);
+  }
+  return hit;
+}
+function cutPoints(word){
+  const cuts = [];
+  for (let i = 0; i < word.length; i++){
+    const c = word[i];
+    if (((c >= "\u0904" && c <= "\u0939") || (c >= "\u0958" && c <= "\u095f")) &&
+        !(i > 0 && "\u094d\u200c\u200d".indexOf(word[i - 1]) !== -1)) cuts.push(i);
+  }
+  return cuts;
+}
+function convertWord(word){
+  const hit = cache.get(word);
+  if (hit !== undefined) return hit;
+  if (word.length <= PIECE * 2) return convertPiece(word);
+  const out = [];
+  let start = 0;
+  for (const c of cutPoints(word)){
+    if (c - start >= PIECE){
+      out.push(convertPiece(word.slice(start, c)));
+      start = c;
+    }
+  }
+  out.push(convertPiece(word.slice(start)));
+  return out.join("");
+}
+// straight single quotes: opening after start / space / bracket / dash, else closing
+const OPEN_Q = /(^|[\s(\[{<"\u201c\u2018\u2013\u2014\/-])'/gm;
+function preprocess(text){
+  return text.replace(OPEN_Q, (m, g) => g + "\u2018").split("'").join("\u2019")
+             .split(":").join("\u0903");   // typed ":" is treated as visarga ः -> M (same length, so highlight positions stay valid)
+}
+
+  return {
+    convert:function(text){
+      if(text==='') return '';
+      return preprocess(text).split(/(\s+)/).map(function(tok){
+        return (tok===''||/^\s+$/.test(tok))?tok:convertWord(tok);
+      }).join('');
+    },
+    placeholder:function(text){return preprocess(text).split(' ').map(convertWord).join(' ');}
+  };
+})();
+
+</script>
+<script>
 (function(){
   var $=function(id){return document.getElementById(id)};
   var inp=$('in'), out=$('out'), smart=$('smart'), status=$('status');
 
+  var kant=$('kant'), warn=$('fontwarn'), plain=out.placeholder;
+  var kantPlaceholder=Kantipur.placeholder('\u0928\u092E\u0938\u094D\u0924\u0947, \u092E\u0947\u0930\u094B \u0928\u093E\u092E \u0930\u093E\u092E \u0939\u094B \u0964');
+
   function convert(){
     // the converter appends one space after every word; drop the last one so output mirrors input
-    out.value=inp.value?NepaliUnicode.toNepali(inp.value,{smart:smart.checked}).replace(/ $/,''):'';
+    var uni=inp.value?NepaliUnicode.toNepali(inp.value,{smart:smart.checked}).replace(/ $/,''):'';
+    out.value=kant.checked?Kantipur.convert(uni):uni;
     var n=inp.value.length;
     status.textContent=n?n+' character'+(n===1?'':'s'):'';
   }
+
+  // Kantipur output is legacy-encoded text: it only reads as Nepali in the Kantipur font.
+  function setFont(){
+    var on=kant.checked;
+    out.setAttribute('data-font',on?'kantipur':'unicode');
+    out.placeholder=on?kantPlaceholder:plain;
+    warn.textContent='';
+    if(on){
+      var ok=document.fonts&&document.fonts.load?document.fonts.load('20px KantipurWeb','abc').then(function(f){
+        return f.length>0&&f.every(function(x){return x.status==='loaded'});
+      },function(){return false}):Promise.resolve(false);
+      ok.then(function(loaded){
+        if(!loaded&&kant.checked) warn.textContent='Could not load "Kantipur Regular.ttf". It must be in the same folder as this page, with the same file name and capitalisation.';
+      });
+    }
+    convert();
+  }
+  kant.addEventListener('change',setFont);
+
   inp.addEventListener('input',convert);
   smart.addEventListener('change',convert);
 
