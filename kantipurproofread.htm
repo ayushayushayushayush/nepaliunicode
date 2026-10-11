@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kantipur Proofread – spell check Kantipur text</title>
+<style>
+:root{
+  --bg:#eef1f7; --panel:#fff; --ink:#1b2438; --muted:#5d6980; --line:#cfd6e4;
+  --brand:#233a73; --brand-ink:#fff; --accent:#c8102e; --focus:#2f6df6;
+  --out-bg:#f7f9fd; --miss:#d91e2e;
+  --latin:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#10162a; --panel:#182040; --ink:#e8ecf7; --muted:#9aa6c2; --line:#2e3a63;
+    --brand:#7f9cf5; --brand-ink:#0d1226; --accent:#ff5a73; --focus:#8fb0ff; --out-bg:#131a35; --miss:#ff5c66;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 var(--latin);min-height:100%}
+.wrap{max-width:1040px;margin:0 auto;padding:28px 18px 48px}
+h1{font-size:20px;margin:0 0 14px}
+.pane{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.pane label{font-weight:600;font-size:14px;color:var(--muted)}
+@font-face{font-family:"KantipurWeb";src:url("Kantipur%20Regular.ttf") format("truetype");font-display:swap}
+.hl{position:relative;display:flex;background:var(--panel);border-radius:6px}
+#txt,#mirror{font:26px/1.6 "KantipurWeb",monospace}
+#txt{position:relative;z-index:1;flex:1;width:100%;min-height:380px;resize:vertical;border:1px solid var(--line);border-radius:6px;padding:12px;background:transparent;color:var(--ink)}
+#mirror{position:absolute;inset:0;margin:0;padding:12px;border:1px solid transparent;overflow:hidden;white-space:pre-wrap;overflow-wrap:break-word;color:transparent;pointer-events:none}
+#mirror mark{background:none;color:transparent;text-decoration-line:underline;text-decoration-style:wavy;text-decoration-color:var(--miss);text-decoration-thickness:2px;text-underline-offset:.18em}
+.warn{margin:10px 0 0;color:var(--accent);font-size:14px}
+.warn:empty{display:none}
+#tip{position:fixed;z-index:50;display:block;max-width:min(92vw,380px);background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 28px rgba(15,25,60,.22);padding:10px 12px}
+#tip[hidden]{display:none}
+#tiphead{font-size:13px;color:var(--muted);margin-bottom:8px}
+#tiplist{display:flex;flex-wrap:wrap;gap:6px}
+#tiplist button{font:24px/1.3 "KantipurWeb",monospace;font-weight:400;padding:3px 10px;background:var(--out-bg);color:var(--ink);border:1px solid var(--line)}
+#tiplist button:hover{border-color:var(--brand)}
+#tipnote{font-size:12px;color:var(--accent);margin-top:8px}
+#tipnote:empty{display:none}
+.spell{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-top:10px;font-size:14px;color:var(--muted)}
+.spell button{padding:5px 12px;font-size:13px}
+textarea:focus,button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(--focus);outline-offset:1px}
+.bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-top:14px}
+button{font:600 14px var(--latin);padding:9px 16px;border-radius:6px;border:1px solid var(--brand);background:var(--brand);color:var(--brand-ink);cursor:pointer}
+button.ghost{background:transparent;color:var(--brand)}
+button:hover{filter:brightness(1.08)}
+.stat{margin-left:auto;font-size:13px;color:var(--muted)}
+.footnav{display:flex;justify-content:center;margin-top:28px}
+a.btn{display:inline-block;font:600 14px var(--latin);padding:10px 20px;border-radius:6px;border:1px solid var(--brand);background:var(--brand);color:var(--brand-ink);text-decoration:none}
+a.btn:hover{filter:brightness(1.08)}
+@media (prefers-reduced-motion:no-preference){button{transition:filter .15s}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <main>
+    <h1>Kantipur Proofread</h1>
+    <section class="pane">
+      <label for="txt">Paste your Kantipur text here. Words not found in the dictionary are underlined.</label>
+      <div class="hl"><div id="mirror" aria-hidden="true"></div><textarea id="txt" spellcheck="false" autofocus></textarea></div>
+    </section>
+
+    <div class="bar">
+      <button id="copy" type="button">Copy text</button>
+      <button id="clear" type="button" class="ghost">Clear</button>
+      <span class="stat" id="status" role="status" aria-live="polite"></span>
+    </div>
+
+    <p id="fontwarn" class="warn" role="alert"></p>
+    <div class="spell">
+      <span id="info" role="status"></span>
+      <button id="dictbtn" type="button" class="ghost">Load eligible.txt…</button>
+      <input id="dictfile" type="file" accept=".txt,text/plain" hidden>
+    </div>
+
+    <nav class="footnav"><a class="btn" href="index.htm">NEPALI UNICODE CONVERTER</a></nav>
+  </main>
+</div>
+
+<div id="tip" role="dialog" aria-label="Suggested words" hidden>
+  <div id="tiphead"></div><div id="tiplist"></div><div id="tipnote"></div>
+</div>
+
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id)};
+  var txt=$('txt'), mirror=$('mirror'), status=$('status'), info=$('info'), warn=$('fontwarn');
+
+  // eligible.txt holds Kantipur-encoded words, one per line (same file as the converter page).
+  // Every word in the pasted text is looked up in that list exactly as typed.
+  var dict=null, dictFrom='', dictState='idle', missCount=0, wordCount=0, entries=[], wordEls=[];
+  // Sentence punctuation that may be attached to a word. Other symbols are letters or vowel signs in Kantipur.
+  var PUNCT='.,=-_‘’';
+
+  function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+  function decode(buf){
+    var b=new Uint8Array(buf);
+    if(b[0]===0xFF&&b[1]===0xFE) return new TextDecoder('utf-16le').decode(buf);
+    if(b[0]===0xFE&&b[1]===0xFF) return new TextDecoder('utf-16be').decode(buf);
+    try{return new TextDecoder('utf-8',{fatal:true}).decode(buf)}
+    catch(e){return new TextDecoder('windows-1252').decode(buf)}
+  }
+  function parseDict(text){
+    var set=new Set(), lines=text.split(/\r?\n/);
+    for(var i=0;i<lines.length;i++){var l=lines[i].trim(); if(l) set.add(l)}
+    return set;
+  }
+
+  // Saved copy of the word list. IndexedDB, because a list this size will not fit in localStorage.
+  function kv(mode,fn){
+    return new Promise(function(res,rej){
+      if(typeof indexedDB==='undefined') return rej(new Error('no indexedDB'));
+      var o=indexedDB.open('nepaliUnicodeConverter',1);
+      o.onupgradeneeded=function(){o.result.createObjectStore('kv')};
+      o.onerror=function(){rej(o.error)};
+      o.onsuccess=function(){
+        var db=o.result, tx=db.transaction('kv',mode), q=fn(tx.objectStore('kv'));
+        tx.oncomplete=function(){db.close();res(q.result)};
+        tx.onerror=tx.onabort=function(){db.close();rej(tx.error)};
+      };
+    });
+  }
+  function saveDict(text){return kv('readwrite',function(s){return s.put(text,'eligible')}).catch(function(){})}
+  function loadSaved(){return kv('readonly',function(s){return s.get('eligible')}).catch(function(){return null})}
+
+  function useDict(text,from,save){
+    var set=parseDict(text);
+    if(!set.size){dictState='empty';paint();return false}
+    dict=set; dictFrom=from; dictState='ready';
+    buildIndex(set);
+    if(save) saveDict(text);
+    paint(); return true;
+  }
+  function autoLoad(){
+    if(dict||dictState==='loading') return;
+    dictState='loading'; paint();
+    var req=(typeof fetch==='function')?fetch('eligible.txt',{cache:'no-cache'}).then(function(r){
+      if(!r.ok) throw new Error('http '+r.status); return r.arrayBuffer();
+    }):Promise.reject(new Error('no fetch'));
+    req.then(function(buf){
+      if(!useDict(decode(buf),'eligible.txt',true)) throw new Error('empty');
+    }).catch(function(){
+      // Browsers usually refuse to read files next to a page opened from disk (file://).
+      return loadSaved().then(function(saved){
+        if(!(saved&&useDict(saved,'saved copy',false))){dictState='failed';paint();}
+      });
+    });
+  }
+  $('dictbtn').addEventListener('click',function(){$('dictfile').click()});
+  $('dictfile').addEventListener('change',function(e){
+    var f=e.target.files[0]; if(!f) return;
+    f.arrayBuffer().then(function(buf){
+      if(!useDict(decode(buf),f.name,true)) info.textContent='That file has no words in it.';
+    });
+    e.target.value='';
+  });
+
+  // ---- suggestions (closest dictionary words) ----
+  var byLen=null, sugCache=new Map();
+  var ROWS=[new Int32Array(64),new Int32Array(64),new Int32Array(64)];
+  function buildIndex(set){
+    byLen=new Map(); sugCache=new Map();
+    set.forEach(function(w){var a=byLen.get(w.length); if(!a) byLen.set(w.length,a=[]); a.push(w)});
+  }
+  // Edit distance (insert, delete, replace, swap two neighbours); gives up once it must exceed `max`.
+  function osa(a,b,max){
+    var n=a.length, m=b.length;
+    if(n-m>max||m-n>max) return max+1;
+    var r0=ROWS[0], r1=ROWS[1], r2=ROWS[2], i, j, t, prevBest=0;
+    for(j=0;j<=m;j++) r1[j]=j;
+    for(i=1;i<=n;i++){
+      var ai=a.charCodeAt(i-1), best=r0[0]=i;
+      for(j=1;j<=m;j++){
+        var bj=b.charCodeAt(j-1), v=r1[j-1]+(ai===bj?0:1), x=r1[j]+1, y=r0[j-1]+1;
+        if(x<v) v=x; if(y<v) v=y;
+        if(i>1&&j>1&&ai===b.charCodeAt(j-2)&&a.charCodeAt(i-2)===bj&&r2[j-2]+1<v) v=r2[j-2]+1;
+        r0[j]=v; if(v<best) best=v;
+      }
+      if(i>1&&best>max&&prevBest>max) return max+1;   // a swap can skip one row, so look at two
+      prevBest=best; t=r2; r2=r1; r1=r0; r0=t;
+    }
+    return r1[m];
+  }
+  function suggest(key){
+    var hit=sugCache.get(key); if(hit) return hit;
+    var L=key.length, max=L<=3?1:2, res=[];
+    if(byLen&&L<=30){
+      for(var l=L-max;l<=L+max;l++){
+        var arr=byLen.get(l); if(!arr) continue;
+        for(var i=0;i<arr.length;i++){
+          var w=arr[i], d=osa(key,w,max);
+          if(d>max) continue;
+          var p=0, s=0, k=Math.min(L,w.length);
+          while(p<k&&key.charCodeAt(p)===w.charCodeAt(p)) p++;
+          while(s<k&&key.charCodeAt(L-1-s)===w.charCodeAt(w.length-1-s)) s++;
+          res.push({w:w,d:d,p:p,s:s,l:Math.abs(w.length-L)});
+        }
+      }
+      res.sort(function(x,y){return x.d-y.d||y.p-x.p||y.s-x.s||x.l-y.l||(x.w<y.w?-1:x.w>y.w?1:0)});
+    }
+    var out=res.slice(0,8).map(function(r){return r.w});
+    sugCache.set(key,out); return out;
+  }
+  // ---- end suggestions ----
+
+  function syncMirror(){
+    // match the wrapping width of the textarea (its scrollbar, if any, narrows the text area)
+    var sb=Math.max(0,txt.offsetWidth-txt.clientWidth-2);
+    mirror.style.paddingRight=(12+sb)+'px';
+    mirror.scrollTop=txt.scrollTop;
+  }
+
+  // Look up every word and draw the underlines on the mirror layer behind the textarea.
+  function paint(){
+    closeTip(); entries=[]; missCount=0; wordCount=0; wordEls=[];
+    var v=txt.value;
+    if(dict){
+      var html='', pos=0, re=/\S+/g, m;
+      while((m=re.exec(v))){
+        var tok=m[0], a=0, b=tok.length;
+        wordCount++;
+        html+=esc(v.slice(pos,m.index));
+        pos=m.index+tok.length;
+        if(!dict.has(tok)){
+          while(a<b&&PUNCT.indexOf(tok.charAt(a))>=0) a++;       // leave sentence punctuation out of the word
+          while(b>a&&PUNCT.indexOf(tok.charAt(b-1))>=0) b--;
+          if(b>a&&!dict.has(tok.slice(a,b))){
+            var i=entries.push({k:tok.slice(a,b),s:m.index+a,e:m.index+b})-1;
+            missCount++;
+            html+=esc(tok.slice(0,a))+'<mark data-i="'+i+'">'+esc(tok.slice(a,b))+'</mark>'+esc(tok.slice(b));
+            continue;
+          }
+        }
+        html+=esc(tok);
+      }
+      mirror.innerHTML=html+esc(v.slice(pos))+'\n';
+      wordEls=mirror.querySelectorAll('mark');   // reading order
+    } else mirror.textContent='';
+    if(!wordEls.length) txt.style.cursor='';
+    info.textContent=
+      dictState==='ready'?'Dictionary: '+dict.size.toLocaleString()+' words ('+dictFrom+') · '+missCount.toLocaleString()+' not found'+(missCount?'. Click or hover an underlined word to pick a replacement.':''):
+      dictState==='loading'?'Loading eligible.txt…':
+      dictState==='empty'?'eligible.txt has no words in it.':
+      dictState==='failed'?'Could not open eligible.txt automatically (browsers block this for pages opened from disk). Choose the file once and it will be remembered.':'';
+    status.textContent=wordCount?wordCount.toLocaleString()+' word'+(wordCount===1?'':'s'):'';
+    syncMirror();
+  }
+  txt.addEventListener('input',paint);
+  txt.addEventListener('scroll',syncMirror);
+  if(typeof ResizeObserver==='function') new ResizeObserver(syncMirror).observe(txt);
+
+  // ---- suggestion popup ----
+  // The textarea keeps all its normal behaviour (typing, selecting...). To know which
+  // underlined word is under the pointer, the page measures where each underline sits.
+  var tip=$('tip'), tipHead=$('tiphead'), tipList=$('tiplist'), tipNote=$('tipnote');
+  var hoverMark=null, hoverT=0, hideT=0, pinned=false, raf=0, pt=null;
+
+  function fontCheck(){
+    return (document.fonts&&document.fonts.load)?document.fonts.load('20px KantipurWeb','abc').then(function(f){
+      return f.length>0&&f.every(function(x){return x.status==='loaded'});
+    },function(){return false}):Promise.resolve(false);
+  }
+  function copyText(text,ok,fail){
+    function fb(){
+      var t=document.createElement('textarea'); t.value=text; t.style.cssText='position:fixed;opacity:0';
+      document.body.appendChild(t); t.select();
+      var done=false; try{done=document.execCommand('copy')}catch(e){}
+      document.body.removeChild(t); (done?ok:fail)();
+    }
+    if(navigator.clipboard&&window.isSecureContext) navigator.clipboard.writeText(text).then(ok,fb); else fb();
+  }
+  function wordAt(x,y){
+    var n=wordEls.length; if(!n) return null;
+    var lo=0, hi=n-1;                         // words are in reading order: binary search by line
+    while(lo<hi){
+      var mid=(lo+hi)>>1, r0=wordEls[mid].getClientRects()[0];
+      if(r0&&r0.bottom<y-2) lo=mid+1; else hi=mid;
+    }
+    for(var i=Math.max(0,lo-2);i<n;i++){
+      var rs=wordEls[i].getClientRects();
+      if(rs[0]&&rs[0].top>y+3) break;
+      for(var j=0;j<rs.length;j++){
+        var r=rs[j];
+        if(x>=r.left-1&&x<=r.right+1&&y>=r.top-3&&y<=r.bottom+3) return wordEls[i];
+      }
+    }
+    return null;
+  }
+  function closeTip(){clearTimeout(hoverT);clearTimeout(hideT);tip.hidden=true;pinned=false}
+  function scheduleHide(){clearTimeout(hideT);hideT=setTimeout(closeTip,250)}
+  function placeTip(m){
+    var r=m.getClientRects()[0]; if(!r){closeTip();return}
+    var w=tip.offsetWidth, h=tip.offsetHeight, vw=document.documentElement.clientWidth, vh=window.innerHeight;
+    var left=Math.max(8,Math.min(r.left,vw-w-8)), top=r.bottom+6;
+    if(top+h>vh-8&&r.top-h-6>8) top=r.top-h-6;
+    tip.style.left=left+'px'; tip.style.top=top+'px';
+  }
+  // Put the chosen word in place of the underlined one, right in the text box.
+  function replaceWord(e,w){
+    if(txt.value.slice(e.s,e.e)!==e.k) return;     // the text changed since the underline was drawn
+    var top=txt.scrollTop;
+    txt.focus(); txt.setSelectionRange(e.s,e.e);
+    var done=false;
+    try{done=document.execCommand('insertText',false,w)}catch(x){}   // keeps Ctrl+Z working
+    if(!done){txt.setRangeText(w,e.s,e.e,'end'); paint();}
+    txt.scrollTop=top; syncMirror();
+    say('Word replaced');
+  }
+  function openTip(m,pin){
+    if(!pin&&pinned&&!tip.hidden) return;     // hovering never replaces a popup the user clicked open
+    clearTimeout(hideT);
+    var e=entries[+m.getAttribute('data-i')], list=suggest(e.k);
+    tipList.textContent='';
+    list.forEach(function(w){
+      var b=document.createElement('button'); b.type='button'; b.textContent=w;
+      b.addEventListener('click',function(){closeTip();replaceWord(e,w)});
+      tipList.appendChild(b);
+    });
+    tipHead.textContent=list.length?'Not in the dictionary. Closest words (click one to replace this word):':'Not in the dictionary, and no close match was found.';
+    tipNote.textContent='';
+    tip.hidden=false; pinned=!!pin;
+    placeTip(m);
+    if(list.length) fontCheck().then(function(ok){
+      if(!ok&&!tip.hidden){tipNote.textContent='"Kantipur Regular.ttf" was not found, so these words appear as encoded text.';placeTip(m)}
+    });
+  }
+  function onMove(){
+    raf=0;
+    var m=pt?wordAt(pt[0],pt[1]):null;
+    var cur=m?'pointer':'';
+    if(txt.style.cursor!==cur) txt.style.cursor=cur;
+    if(m){
+      clearTimeout(hideT);
+      if(m!==hoverMark){hoverMark=m;clearTimeout(hoverT);hoverT=setTimeout(function(){openTip(m,false)},250)}
+    } else {
+      hoverMark=null; clearTimeout(hoverT);
+      if(!pinned&&!tip.hidden) scheduleHide();
+    }
+  }
+  txt.addEventListener('mousemove',function(e){pt=[e.clientX,e.clientY]; if(!raf) raf=requestAnimationFrame(onMove)});
+  txt.addEventListener('mouseleave',function(){hoverMark=null;clearTimeout(hoverT);if(!pinned&&!tip.hidden) scheduleHide()});
+  txt.addEventListener('click',function(e){
+    clearTimeout(hoverT);
+    if(txt.selectionStart!==txt.selectionEnd) return;   // the user is selecting text, not asking for a popup
+    var m=wordAt(e.clientX,e.clientY); if(m) openTip(m,true);
+  });
+  tip.addEventListener('mouseenter',function(){clearTimeout(hideT)});
+  tip.addEventListener('mouseleave',function(){if(!pinned) scheduleHide()});
+  document.addEventListener('mousedown',function(e){if(!tip.hidden&&!tip.contains(e.target)) closeTip()});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape') closeTip()});
+  window.addEventListener('scroll',function(e){if(e.target!==tip) closeTip()},true);
+
+  var flash;
+  function say(msg){status.textContent=msg;clearTimeout(flash);flash=setTimeout(function(){status.textContent=wordCount?wordCount.toLocaleString()+' word'+(wordCount===1?'':'s'):''},1600)}
+  $('copy').addEventListener('click',function(){
+    if(!txt.value){say('Nothing to copy yet');return}
+    copyText(txt.value,function(){say('Copied')},function(){txt.focus();txt.select();say('Press Ctrl+C to copy')});
+  });
+  $('clear').addEventListener('click',function(){
+    if(txt.value.length>=30 && !confirm('Clear all the text?')) return;
+    txt.value=''; paint(); txt.focus();
+  });
+
+  // The text only reads as Nepali in the Kantipur font.
+  fontCheck().then(function(loaded){
+    if(!loaded) warn.textContent='Could not load "Kantipur Regular.ttf". It must be in the same folder as this page, with the same file name and capitalisation.';
+  });
+
+  paint();
+  autoLoad();   // CheckSpell is always on here
+})();
+</script>
+</body>
+</html>
