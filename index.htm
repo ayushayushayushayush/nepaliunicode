@@ -30,8 +30,11 @@ textarea{width:100%;min-height:260px;resize:vertical;border:1px solid var(--line
 .hl{position:relative;display:flex;background:var(--out-bg);border-radius:6px}
 #out,#mirror{font:22px/1.7 var(--deva)}
 #out{position:relative;z-index:1;flex:1;background:transparent}
-#mirror{position:absolute;inset:0;margin:0;padding:12px;border:1px solid transparent;overflow:hidden;white-space:pre-wrap;overflow-wrap:break-word;color:transparent;pointer-events:none}
-#mirror mark{background:none;color:transparent;text-decoration-line:underline;text-decoration-style:wavy;text-decoration-color:var(--miss);text-decoration-thickness:2px;text-underline-offset:.18em}
+#mirror,#imirror{position:absolute;inset:0;margin:0;padding:12px;border:1px solid transparent;overflow:hidden;white-space:pre-wrap;overflow-wrap:break-word;color:transparent;pointer-events:none}
+.hl-in{background:var(--panel)}
+#in{position:relative;z-index:1;flex:1;background:transparent}
+#imirror{font:18px/1.6 var(--latin)}
+#mirror mark,#imirror mark{background:none;color:transparent;text-decoration-line:underline;text-decoration-style:wavy;text-decoration-color:var(--miss);text-decoration-thickness:2px;text-underline-offset:.18em}
 @font-face{font-family:"KantipurWeb";src:url("Kantipur%20Regular.ttf") format("truetype");font-display:swap}
 #out[data-font="kantipur"],#mirror[data-font="kantipur"]{font-family:"KantipurWeb",monospace;font-size:26px;line-height:1.6}
 .warn{margin:10px 0 0;color:var(--accent);font-size:14px}
@@ -44,6 +47,9 @@ textarea{width:100%;min-height:260px;resize:vertical;border:1px solid var(--line
 #tiplist button:hover{border-color:var(--brand)}
 #tipnote{font-size:12px;color:var(--accent);margin-top:8px}
 #tipnote:empty{display:none}
+#tipundo{margin-top:8px}
+#tipundo:empty{display:none}
+#tipundo button{padding:4px 10px;font-size:13px}
 .spell{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-top:10px;font-size:14px;color:var(--muted)}
 .spell[hidden]{display:none}
 .spell button{padding:5px 12px;font-size:13px}
@@ -54,6 +60,8 @@ button.ghost{background:transparent;color:var(--brand)}
 button:hover{filter:brightness(1.08)}
 .opt{display:flex;gap:7px;align-items:center;font-size:14px;cursor:pointer}
 .opt input{width:17px;height:17px;accent-color:var(--brand)}
+.opt.off{opacity:.5;cursor:not-allowed}
+.opt.off input{cursor:not-allowed}
 .stat{margin-left:auto;font-size:13px;color:var(--muted)}
 details{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px 16px}
 summary{cursor:pointer;font-weight:600;padding:12px 0}
@@ -76,7 +84,7 @@ summary{cursor:pointer;font-weight:600;padding:12px 0}
     <div class="panes">
       <section class="pane">
         <label for="in">Romanized Nepali</label>
-        <textarea id="in" spellcheck="false" autofocus placeholder="namaste, mero naam raam ho."></textarea>
+        <div class="hl hl-in"><div id="imirror" aria-hidden="true"></div><textarea id="in" spellcheck="false" autofocus placeholder="namaste, mero naam raam ho."></textarea></div>
       </section>
       <section class="pane">
         <label for="out">Nepali Unicode</label>
@@ -89,7 +97,7 @@ summary{cursor:pointer;font-weight:600;padding:12px 0}
       <button id="clear" type="button" class="ghost">Clear</button>
       <label class="opt"><input id="smart" type="checkbox" checked> Smart converter</label>
       <label class="opt"><input id="kant" type="checkbox"> Kantipur</label>
-      <label class="opt"><input id="spell" type="checkbox"> CheckSpell</label>
+      <label class="opt off" id="spellopt" title="CheckSpell is available only when Kantipur is enabled"><input id="spell" type="checkbox" disabled> CheckSpell</label>
       <span class="stat" id="status" role="status" aria-live="polite"></span>
     </div>
 
@@ -108,7 +116,7 @@ summary{cursor:pointer;font-weight:600;padding:12px 0}
 </div>
 
 <div id="tip" role="dialog" aria-label="Related words" hidden>
-  <div id="tiphead"></div><div id="tiplist"></div><div id="tipnote"></div>
+  <div id="tiphead"></div><div id="tiplist"></div><div id="tipnote"></div><div id="tipundo"></div>
 </div>
 
 <script>
@@ -619,15 +627,15 @@ function preprocess(text){
   var inp=$('in'), out=$('out'), smart=$('smart'), status=$('status');
 
   var kant=$('kant'), spell=$('spell'), warn=$('fontwarn'), plain=out.placeholder;
-  var mirror=$('mirror'), spellrow=$('spellrow'), spellinfo=$('spellinfo');
+  var mirror=$('mirror'), imirror=$('imirror'), spellrow=$('spellrow'), spellinfo=$('spellinfo');
   var kantPlaceholder=Kantipur.placeholder('\u0928\u092E\u0938\u094D\u0924\u0947, \u092E\u0947\u0930\u094B \u0928\u093E\u092E \u0930\u093E\u092E \u0939\u094B \u0964');
 
   // ---- spell check -------------------------------------------------------
   // eligible.txt holds Kantipur-encoded words, one per line. Every Devanagari
   // word is converted with the same Kantipur logic and looked up in that list,
-  // so the check works whether or not the Kantipur display is switched on.
+  // CheckSpell is only available while Kantipur is switched on.
   var dict=null, dictFrom='', dictState='idle', missCount=0, wordKeys=[], wordEls=[];
-  var RUN=/[\u0900-\u0963\u0971-\u097F\u200C\u200D]+/g, LETTER=/[\u0904-\u0939\u0958-\u095F]/;
+  var RUNSPLIT=/([\u0900-\u0963\u0971-\u097F\u200C\u200D]+)/, LETTER=/[\u0904-\u0939\u0958-\u095F]/;
 
   function decode(buf){
     var b=new Uint8Array(buf);
@@ -753,61 +761,135 @@ function preprocess(text){
   // ---- end suggestions ----
 
   function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
-  // Kantipur form of the word in `tok` to look up: the first word that is not in the dictionary
-  // (miss:true), else the first word (miss:false). k is '' when `tok` has no letters (e.g. a danda).
-  function keyOf(tok){
-    var runs=tok.match(RUN), first='';
-    if(!runs) return {k:'',miss:false};
-    for(var i=0;i<runs.length;i++){
-      if(!LETTER.test(runs[i])) continue;
-      var k=Kantipur.convert(runs[i]).trim();   // dictionary lines are trimmed too, so compare like with like
-      if(!dict.has(k)) return {k:k,miss:true};
-      if(!first) first=k;
+  // Words the user replaced from the suggestion popup.
+  // key = typed (romanized) word + SEP + n-th Nepali word it produced + SEP + n-th letter run -> chosen Kantipur word.
+  // Keyed by the typed text, so a replacement survives edits elsewhere and disappears when that typed word is changed.
+  var SEP='\u0001', overrides=new Map();
+  var INTOK=/(?:\{[^}]*(?:\}|$)|\[[^\]]*(?:\]|$)|\S)+/g;   // a typed word; {...} spans stay in one piece
+  var cntCache=new Map();
+
+  function inTokens(src){
+    var a=[], m; INTOK.lastIndex=0;
+    while((m=INTOK.exec(src))) a.push({s:m[0],i:m.index});
+    return a;
+  }
+  // How many output words one typed word turns into (normally 1; "ho." gives 2 in smart mode).
+  function outCount(tok){
+    var k=(smart.checked?'s':'p')+tok, c=cntCache.get(k);
+    if(c===undefined){
+      var o=NepaliUnicode.toNepali(tok,{smart:smart.checked}).match(/\S+/g);
+      c=o?o.length:0;
+      if(cntCache.size>20000) cntCache.clear();
+      cntCache.set(k,c);
     }
-    return {k:first,miss:false};
+    return c;
   }
-  function syncMirror(){
+  // Which typed word produced each output word. null when the counts do not line up.
+  function ownership(toks,total){
+    var owner=[];
+    for(var i=0;i<toks.length;i++){var c=outCount(toks[i].s); for(var j=0;j<c;j++) owner.push({i:i,j:j})}
+    return owner.length===total?owner:null;
+  }
+
+  // Builds the Kantipur output (with the user's replacements applied) and, when CheckSpell is on,
+  // the underlined mirror for it. Also reports which typed words have a replacement.
+  function renderKant(src,uni){
+    var want=spell.checked&&!!dict, parts=uni.split(/(\s+)/), total=0, p;
+    for(p=0;p<parts.length;p++) if(parts[p]!==''&&!/^\s+$/.test(parts[p])) total++;
+    var toks=null, owner=null;
+    if(src&&(overrides.size||spell.checked)){toks=inTokens(src); owner=ownership(toks,total)}
+    var text='', html='', entries=[], miss=0, marked=new Set(), t=0;
+    for(p=0;p<parts.length;p++){
+      var tok=parts[p];
+      if(tok==='') continue;
+      if(/^\s+$/.test(tok)){text+=tok; html+=tok; continue}
+      var ow=owner?owner[t]:null; t++;
+      var base=ow?toks[ow.i].s+SEP+ow.j+SEP:null;
+      var segs=tok.split(RUNSPLIT), runs=[], anyOv=false, ri=0, q, x;
+      for(q=1;q<segs.length;q+=2){
+        if(!LETTER.test(segs[q])) continue;
+        var k=Kantipur.convert(segs[q]).trim();   // dictionary lines are trimmed too, so compare like with like
+        var ov=base!==null?overrides.get(base+ri):undefined;
+        if(ov!==undefined) anyOv=true;
+        runs.push({q:q,k:k,ri:ri,miss:want?!dict.has(k):false,ov:ov});
+        ri++;
+      }
+      var shown;
+      if(anyOv){
+        shown='';
+        for(q=0;q<segs.length;q++){
+          if(segs[q]==='') continue;
+          var r=null;
+          if(q%2) for(x=0;x<runs.length;x++) if(runs[x].q===q) r=runs[x];
+          shown+=(r&&r.ov!==undefined)?r.ov:Kantipur.convert(segs[q]);
+        }
+        marked.add(ow.i);
+      } else shown=Kantipur.convert(tok);
+      text+=shown;
+      if(!want) continue;
+      // the word the popup is about: first one still not found, else a replaced one, else the first
+      var tg=null;
+      for(x=0;x<runs.length&&!tg;x++) if(runs[x].miss&&runs[x].ov===undefined) tg=runs[x];
+      for(x=0;x<runs.length&&!tg;x++) if(runs[x].ov!==undefined) tg=runs[x];
+      if(!tg) tg=runs[0]||null;
+      if(!tg){html+=esc(shown); continue}
+      var st=(tg.miss&&tg.ov===undefined)?'miss':(tg.ov!==undefined?'fixed':'ok');
+      var idx=entries.push({k:tg.k,ri:tg.ri,base:base,miss:tg.miss,state:st})-1;
+      if(st==='miss'){miss++; html+='<mark data-i="'+idx+'">'+esc(shown)+'</mark>'}   // underlined
+      else html+='<span data-i="'+idx+'">'+esc(shown)+'</span>';                      // known or replaced word: no underline
+    }
+    return {text:text,html:want?html:undefined,entries:entries,miss:miss,marked:marked,toks:toks};
+  }
+
+  function syncOne(ta,m){
     // match the wrapping width of the textarea (its scrollbar, if any, narrows the text area)
-    var sb=Math.max(0,out.offsetWidth-out.clientWidth-2);
-    mirror.style.paddingRight=(12+sb)+'px';
-    mirror.scrollTop=out.scrollTop;
+    var sb=Math.max(0,ta.offsetWidth-ta.clientWidth-2);
+    m.style.paddingRight=(12+sb)+'px';
+    m.scrollTop=ta.scrollTop;
   }
-  function paintSpell(uni){
-    var on=spell.checked;
+  function syncMirror(){syncOne(out,mirror); syncOne(inp,imirror)}
+
+  // Red wavy underline on the typed words whose output was replaced by a picked suggestion.
+  function paintInput(src,toks,marked){
+    if(!marked||!marked.size||!toks){imirror.textContent=''; return}
+    var html='', pos=0;
+    toks.forEach(function(t,i){
+      html+=esc(src.slice(pos,t.i));
+      html+=marked.has(i)?'<mark>'+esc(t.s)+'</mark>':esc(t.s);
+      pos=t.i+t.s.length;
+    });
+    imirror.innerHTML=html+esc(src.slice(pos))+'\n';
+    syncOne(inp,imirror);
+  }
+
+  function paintSpell(r){
+    var on=spell.checked&&kant.checked;
     spellrow.hidden=!on;
-    closeTip(); missCount=0; wordKeys=[]; wordEls=[];
-    if(on&&dict){
-      var html='';
-      uni.split(/(\s+)/).forEach(function(tok){
-        if(tok==='') return;
-        if(/^\s+$/.test(tok)){html+=tok;return}
-        var shown=kant.checked?Kantipur.convert(tok):tok, w=keyOf(tok);
-        if(!w.k){html+=esc(shown);return}
-        var i=wordKeys.push(w.k)-1;
-        if(w.miss){missCount++;html+='<mark data-i="'+i+'">'+esc(shown)+'</mark>'}   // underlined
-        else html+='<span data-i="'+i+'">'+esc(shown)+'</span>';                     // known word: no underline
-      });
-      mirror.innerHTML=html+'\n';
+    closeTip(); missCount=r.miss||0; wordKeys=r.entries||[]; wordEls=[];
+    if(on&&dict&&r.html!==undefined){
+      mirror.innerHTML=r.html+'\n';
       wordEls=mirror.querySelectorAll('mark,span[data-i]');   // reading order
     } else mirror.textContent='';
     if(!wordEls.length) out.style.cursor='';
     if(on){
+      var fixed=r.marked?r.marked.size:0;
       spellinfo.textContent=
-        dictState==='ready'?'Dictionary: '+dict.size.toLocaleString()+' words ('+dictFrom+') \u00B7 '+missCount.toLocaleString()+' not found'+(wordKeys.length?'. Click any word, or hover an underlined one, for related words.':''):
-        dictState==='loading'?'Loading eligible.txt\u2026':
+        dictState==='ready'?'Dictionary: '+dict.size.toLocaleString()+' words ('+dictFrom+') · '+missCount.toLocaleString()+' not found'+(fixed?' · '+fixed.toLocaleString()+' replaced (underlined in your typed text)':'')+(wordKeys.length?'. Click any word, or hover an underlined one, to see other words and replace it.':''):
+        dictState==='loading'?'Loading eligible.txt…':
         dictState==='empty'?'eligible.txt has no words in it.':
         'Could not open eligible.txt automatically (browsers block this for pages opened from disk). Choose the file once and it will be remembered.';
     }
     syncMirror();
   }
   out.addEventListener('scroll',syncMirror);
-  if(typeof ResizeObserver==='function') new ResizeObserver(syncMirror).observe(out);
+  inp.addEventListener('scroll',syncMirror);
+  if(typeof ResizeObserver==='function'){var ro=new ResizeObserver(syncMirror); ro.observe(out); ro.observe(inp)}
   spell.addEventListener('change',function(){if(spell.checked) autoLoad(); convert();});
 
   // ---- suggestion popup (click any word; hover only works on underlined words) ----
   // The textarea keeps all its normal behaviour (selecting, double-click...). To know which
   // word is under the pointer, the page measures where each underline sits.
-  var tip=$('tip'), tipHead=$('tiphead'), tipList=$('tiplist'), tipNote=$('tipnote');
+  var tip=$('tip'), tipHead=$('tiphead'), tipList=$('tiplist'), tipNote=$('tipnote'), tipUndo=$('tipundo');
   var hoverMark=null, hoverT=0, hideT=0, pinned=false, raf=0, pt=null;
 
   function fontCheck(){
@@ -853,18 +935,26 @@ function preprocess(text){
   function openTip(m,pin){
     if(!pin&&pinned&&!tip.hidden) return;     // hovering never replaces a popup the user clicked open
     clearTimeout(hideT);
-    var key=wordKeys[+m.getAttribute('data-i')], miss=m.tagName==='MARK';
-    var list=miss?suggest(key):related(key);
-    tipList.textContent='';
+    var e=wordKeys[+m.getAttribute('data-i')], miss=e.miss, can=e.base!==null;
+    var list=miss?suggest(e.k):related(e.k);
+    tipList.textContent=''; tipUndo.textContent='';
     list.forEach(function(w){
-      var b=document.createElement('button'); b.type='button'; b.textContent=w;
-      b.addEventListener('click',function(){copyText(w,function(){say('Copied suggestion')},function(){say('Could not copy')});closeTip()});
+      var b=document.createElement('button'); b.type='button'; b.textContent=w; b.disabled=!can;
+      // replace this word in the Nepali output; the typed word that made it gets underlined
+      b.addEventListener('click',function(){overrides.set(e.base+e.ri,w); closeTip(); convert(); say('Word replaced')});
       tipList.appendChild(b);
     });
-    tipHead.textContent=miss
-      ?(list.length?'Not in the dictionary. Closest words (click one to copy it):':'Not in the dictionary, and no close match was found.')
-      :(list.length?'In the dictionary. Related words (click one to copy it):':'In the dictionary. No related words were found.');
-    tipNote.textContent='';
+    if(e.state==='fixed'&&can){
+      var u=document.createElement('button'); u.type='button'; u.className='ghost'; u.textContent='Undo replacement';
+      u.addEventListener('click',function(){overrides.delete(e.base+e.ri); closeTip(); convert(); say('Replacement undone')});
+      tipUndo.appendChild(u);
+    }
+    tipHead.textContent=e.state==='fixed'
+      ?(list.length?'Replaced. Other words (click one to replace it again):':'Replaced. No other close words were found.')
+      :miss
+      ?(list.length?'Not in the dictionary. Closest words (click one to replace this word):':'Not in the dictionary, and no close match was found.')
+      :(list.length?'In the dictionary. Related words (click one to replace this word):':'In the dictionary. No related words were found.');
+    tipNote.textContent=can?'':'This word could not be matched to a typed word, so it cannot be replaced.';
     tip.hidden=false; pinned=!!pin;
     placeTip(m);
     if(list.length) fontCheck().then(function(ok){
@@ -898,18 +988,23 @@ function preprocess(text){
   document.addEventListener('keydown',function(e){if(e.key==='Escape') closeTip()});
   window.addEventListener('scroll',function(e){if(e.target!==tip) closeTip()},true);
 
+  function countText(){var n=inp.value.length; return n?n+' character'+(n===1?'':'s'):''}
   function convert(){
+    var src=inp.value;
     // the converter appends one space after every word; drop the last one so output mirrors input
-    var uni=inp.value?NepaliUnicode.toNepali(inp.value,{smart:smart.checked}).replace(/ $/,''):'';
-    out.value=kant.checked?Kantipur.convert(uni):uni;
-    paintSpell(uni);
-    var n=inp.value.length;
-    status.textContent=n?n+' character'+(n===1?'':'s'):'';
+    var uni=src?NepaliUnicode.toNepali(src,{smart:smart.checked}).replace(/ $/,''):'';
+    var r=kant.checked?renderKant(src,uni):{text:uni,entries:[],miss:0};
+    out.value=r.text;
+    paintSpell(r);
+    paintInput(src,r.toks,r.marked);
+    status.textContent=countText();
   }
 
   // Kantipur output is legacy-encoded text: it only reads as Nepali in the Kantipur font.
   function setFont(){
     var on=kant.checked;
+    spell.disabled=!on; $('spellopt').classList.toggle('off',!on);   // CheckSpell needs Kantipur
+    if(!on) spell.checked=false;
     out.setAttribute('data-font',on?'kantipur':'unicode');
     mirror.setAttribute('data-font',on?'kantipur':'unicode');
     out.placeholder=on?kantPlaceholder:plain;
@@ -929,11 +1024,11 @@ function preprocess(text){
 
   $('clear').addEventListener('click',function(){
     if(inp.value.length>=30 && !confirm('Clear everything you typed?')) return;
-    inp.value=''; convert(); inp.focus();
+    inp.value=''; overrides.clear(); convert(); inp.focus();
   });
 
   var flash;
-  function say(msg){status.textContent=msg;clearTimeout(flash);flash=setTimeout(convert,1600)}
+  function say(msg){status.textContent=msg;clearTimeout(flash);flash=setTimeout(function(){status.textContent=countText()},1600)}
   $('copy').addEventListener('click',function(){
     if(!out.value){say('Nothing to copy yet');return}
     copyText(out.value,function(){say('Copied')},function(){out.focus();out.select();say('Press Ctrl+C to copy')});
@@ -983,7 +1078,8 @@ function preprocess(text){
     });
     root.appendChild(grid);
   });
-  convert();
+  setFont();
+  if(spell.checked) autoLoad();
 })();
 </script>
 </body>
