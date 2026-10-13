@@ -7,7 +7,7 @@
 <style>
 :root{
   --bg:#eef1f7; --panel:#fff; --ink:#1b2438; --muted:#5d6980; --line:#cfd6e4;
-  --brand:#233a73; --brand-ink:#fff; --accent:#c8102e; --focus:#2f6df6;
+  --brand:#233a73; --brand-ink:#fff; --accent:#c8102e; --focus:#2f6df6; --yellow:#e0a800;
   --out-bg:#f7f9fd; --miss:#d91e2e;
   --deva:"Noto Sans Devanagari","Nirmala UI","Kohinoor Devanagari","Mangal","Lohit Devanagari",sans-serif;
   --latin:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
@@ -15,7 +15,7 @@
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
     --bg:#10162a; --panel:#182040; --ink:#e8ecf7; --muted:#9aa6c2; --line:#2e3a63;
-    --brand:#7f9cf5; --brand-ink:#0d1226; --accent:#ff5a73; --focus:#8fb0ff; --out-bg:#131a35; --miss:#ff5c66;
+    --brand:#7f9cf5; --brand-ink:#0d1226; --accent:#ff5a73; --focus:#8fb0ff; --out-bg:#131a35; --miss:#ff5c66; --yellow:#ffd43b;
   }
 }
 *{box-sizing:border-box}
@@ -35,6 +35,7 @@ textarea{width:100%;min-height:260px;resize:vertical;border:1px solid var(--line
 #in{position:relative;z-index:1;flex:1;background:transparent}
 #imirror{font:18px/1.6 var(--latin)}
 #mirror mark,#imirror mark{background:none;color:transparent;text-decoration-line:underline;text-decoration-style:wavy;text-decoration-color:var(--miss);text-decoration-thickness:2px;text-underline-offset:.18em}
+#imirror mark.y{text-decoration-color:var(--yellow)}
 @font-face{font-family:"KantipurWeb";src:url("Kantipur%20Regular.ttf") format("truetype");font-display:swap}
 #out[data-font="kantipur"],#mirror[data-font="kantipur"]{font-family:"KantipurWeb",monospace;font-size:26px;line-height:1.6}
 .warn{margin:10px 0 0;color:var(--accent);font-size:14px}
@@ -615,7 +616,61 @@ function preprocess(text){
              .split(":").join("\u0903");   // typed ":" is treated as visarga ः -> M (same length, so highlight positions stay valid)
 }
 
+// ==== REVERSE (Kantipur -> Unicode). Not part of CORE; CORE above is untouched. ====
+const REV = new Map();
+let REV_MAX = 1;
+for (let i = 9; i < ARRAY_ONE.length; i++){
+  if (i >= 12 && i <= 15) continue;
+  const a = ARRAY_ONE[i], b = ARRAY_TWO[i];
+  if (a === "" || b === "" || a === b) continue;
+  if (!REV.has(b)) REV.set(b, a);
+  if (b.length > REV_MAX) REV_MAX = b.length;
+}
+REV.set("X", "\u0939\u094d");              // X is ह् (not हृ)
+REV.set("\u0152", "\u0924\u094d\u0924\u094d");
+REV.set("\u00a5", "\u0930\u094d\u200d");
+function reverse(k){
+  if (!k) return null;
+  k = k.replace(/([keq])(['"\]}]+)m/g, "$1m$2");   // undo the "m goes after the matra" swap
+  const toks = [];
+  for (let i = 0; i < k.length;){
+    const ch = k[i];
+    if (ch === "l" || ch === "{"){ toks.push({t: ch}); i++; continue; }
+    let hit = null;
+    for (let n = Math.min(REV_MAX, k.length - i); n > 0; n--){
+      const g = k.substr(i, n);
+      if (REV.has(g)){ hit = [g.length, REV.get(g)]; break; }
+    }
+    if (!hit) return null;
+    toks.push({t: "u", u: hit[1]});
+    i += hit[0];
+  }
+  let out = "";
+  for (let p = 0; p < toks.length; p++){
+    const tk = toks[p];
+    if (tk.t === "u"){ out += tk.u; continue; }
+    if (tk.t === "l"){                              // short-i comes before its cluster
+      let q = p + 1, cl = "";
+      while (q < toks.length && toks[q].t === "u" && toks[q].u.endsWith(HALANT)){ cl += toks[q].u; q++; }
+      if (q >= toks.length || toks[q].t !== "u") return null;
+      cl += toks[q].u; q++;
+      while (q < toks.length && toks[q].t === "u" && toks[q].u.length > 1 && toks[q].u[0] === HALANT){ cl += toks[q].u; q++; }
+      out += cl + "\u093f";
+      p = q - 1;
+      continue;
+    }
+    let i2 = out.length;                            // "{" = reph goes back before its syllable
+    while (i2 > 0 && AFTER_MATRAS.indexOf(out[i2 - 1]) !== -1) i2--;
+    if (i2 === 0 || !isConsonant(out[i2 - 1])) return null;
+    i2--;
+    while (i2 >= 2 && out[i2 - 1] === HALANT && isConsonant(out[i2 - 2])) i2 -= 2;
+    out = out.slice(0, i2) + REPH + out.slice(i2);
+  }
+  return out;
+}
+
   return {
+    reverse:reverse,
     convert:function(text){
       if(text==='') return '';
       return preprocess(text).split(/(\s+)/).map(function(tok){
@@ -770,7 +825,8 @@ function preprocess(text){
   // Words the user replaced from the suggestion popup.
   // key = typed (romanized) word + SEP + n-th Nepali word it produced + SEP + n-th letter run -> chosen Kantipur word.
   // Keyed by the typed text, so a replacement survives edits elsewhere and disappears when that typed word is changed.
-  var SEP='\u0001', overrides=new Map();
+  // fixedRoman = Roman words that were written into the typed text by a picked suggestion (yellow underline).
+  var SEP='\u0001', overrides=new Map(), fixedRoman=new Set();
   var INTOK=/(?:\{[^}]*(?:\}|$)|\[[^\]]*(?:\]|$)|\S)+/g;   // a typed word; {...} spans stay in one piece
   var cntCache=new Map();
 
@@ -803,7 +859,13 @@ function preprocess(text){
     var want=spell.checked&&!!dict, parts=uni.split(/(\s+)/), total=0, p;
     for(p=0;p<parts.length;p++) if(parts[p]!==''&&!/^\s+$/.test(parts[p])) total++;
     var toks=null, owner=null;
-    if(src&&(overrides.size||spell.checked)){toks=inTokens(src); owner=ownership(toks,total)}
+    if(src&&(overrides.size||spell.checked||fixedRoman.size)){toks=inTokens(src); owner=ownership(toks,total)}
+    var yellow=new Set();
+    if(toks&&fixedRoman.size){
+      var present=new Set();
+      toks.forEach(function(t,i){if(fixedRoman.has(t.s)){yellow.add(i); present.add(t.s)}});
+      fixedRoman.forEach(function(s){if(!present.has(s)) fixedRoman.delete(s)});   // forget words that are no longer typed
+    }
     var text='', html='', entries=[], miss=0, marked=new Set(), t=0;
     for(p=0;p<parts.length;p++){
       var tok=parts[p];
@@ -840,11 +902,16 @@ function preprocess(text){
       if(!tg) tg=runs[0]||null;
       if(!tg){html+=esc(shown); continue}
       var st=(tg.miss&&tg.ov===undefined)?'miss':(tg.ov!==undefined?'fixed':'ok');
-      var idx=entries.push({k:tg.k,ri:tg.ri,base:base,miss:tg.miss,state:st})-1;
+      // "simple" = this typed word is one plain Roman word that gave exactly one Nepali word (no punctuation,
+      // no {..} or [..]). Only then can a picked suggestion be written back into the typed text as Roman.
+      var simple=!!(ow&&runs.length===1&&segs.length===3&&segs[0]===''&&segs[2]===''&&
+                    /^[A-Za-z\\*\/\^:]+$/.test(toks[ow.i].s)&&outCount(toks[ow.i].s)===1);
+      var idx=entries.push({k:tg.k,ri:tg.ri,base:base,miss:tg.miss,state:st,
+                            ti:simple?ow.i:-1,typed:simple?toks[ow.i].s:''})-1;
       if(st==='miss'){miss++; html+='<mark data-i="'+idx+'">'+esc(shown)+'</mark>'}   // underlined
       else html+='<span data-i="'+idx+'">'+esc(shown)+'</span>';                      // known or replaced word: no underline
     }
-    return {text:text,html:want?html:undefined,entries:entries,miss:miss,marked:marked,toks:toks};
+    return {text:text,html:want?html:undefined,entries:entries,miss:miss,marked:marked,yellow:yellow,toks:toks};
   }
 
   function syncOne(ta,m){
@@ -855,13 +922,18 @@ function preprocess(text){
   }
   function syncMirror(){syncOne(out,mirror); syncOne(inp,imirror)}
 
-  // Red wavy underline on the typed words whose output was replaced by a picked suggestion.
-  function paintInput(src,toks,marked){
-    if(!marked||!marked.size||!toks){imirror.textContent=''; return}
+  // Wavy underline in the typed (Roman) text:
+  //   red    = the Nepali word was replaced by a picked suggestion, but it could not be written back as Roman
+  //   yellow = the picked suggestion was converted back to Roman and now sits in the typed text
+  function paintInput(src,toks,marked,yellow){
+    var anyRed=marked&&marked.size, anyYel=yellow&&yellow.size;
+    if(!(anyRed||anyYel)||!toks){imirror.textContent=''; return}
     var html='', pos=0;
     toks.forEach(function(t,i){
       html+=esc(src.slice(pos,t.i));
-      html+=marked.has(i)?'<mark>'+esc(t.s)+'</mark>':esc(t.s);
+      html+=(marked&&marked.has(i))?'<mark>'+esc(t.s)+'</mark>'
+           :(yellow&&yellow.has(i))?'<mark class="y">'+esc(t.s)+'</mark>'
+           :esc(t.s);
       pos=t.i+t.s.length;
     });
     imirror.innerHTML=html+esc(src.slice(pos))+'\n';
@@ -878,9 +950,9 @@ function preprocess(text){
     } else mirror.textContent='';
     if(!wordEls.length) out.style.cursor='';
     if(on){
-      var fixed=r.marked?r.marked.size:0;
+      var fixed=r.marked?r.marked.size:0, yel=r.yellow?r.yellow.size:0;
       spellinfo.textContent=
-        dictState==='ready'?'Dictionary: '+dict.size.toLocaleString()+' words ('+dictFrom+') · '+missCount.toLocaleString()+' not found'+(fixed?' · '+fixed.toLocaleString()+' replaced (underlined in your typed text)':'')+(wordKeys.length?'. Click any word, or hover an underlined one, to see other words and replace it.':''):
+        dictState==='ready'?'Dictionary: '+dict.size.toLocaleString()+' words ('+dictFrom+') · '+missCount.toLocaleString()+' not found'+(fixed?' · '+fixed.toLocaleString()+' replaced (red underline: could not be converted to Roman)':'')+(yel?' · '+yel.toLocaleString()+' converted back to Roman (yellow underline)':'')+(wordKeys.length?'. Click any word, or hover an underlined one, to see other words and replace it.':''):
         dictState==='loading'?'Loading eligible.txt…':
         dictState==='empty'?'eligible.txt has no words in it.':
         'Could not open eligible.txt automatically (browsers block this for pages opened from disk). Choose the file once and it will be remembered.';
@@ -891,6 +963,89 @@ function preprocess(text){
   inp.addEventListener('scroll',syncMirror);
   if(typeof ResizeObserver==='function'){var ro=new ResizeObserver(syncMirror); ro.observe(out); ro.observe(inp)}
   spell.addEventListener('change',function(){if(spell.checked) autoLoad(); convert();});
+
+  // ---- picked Kantipur word -> Romanized Nepali ----
+  // When a suggestion is picked, the page tries to turn it back into Roman letters and write those into the
+  // typed text. A candidate is only accepted if the page's own converters turn it back into exactly the picked word.
+  var STEM={'क':'k','ख':'kh','ग':'g','घ':'gh','ङ':'ng','च':'ch','छ':'chh','ज':'j','झ':'jh','ञ':'yn','ट':'T','ठ':'Th','ड':'D','ढ':'Dh','ण':'N','त':'t','थ':'th','द':'d','ध':'dh','न':'n','प':'p','फ':'ph','ब':'b','भ':'bh','म':'m','य':'y','र':'r','ल':'l','व':'w','श':'sh','ष':'Sh','स':'s','ह':'h'};
+  var VOW={'\u0905':'a','\u0906':'aa','\u0907':'i','\u0908':'ii','\u0909':'u','\u090A':'oo','\u090B':'rri','\u0960':'rree','\u090F':'e','\u0910':'ai','\u0913':'o','\u0914':'au','\u0950':'om'};
+  var SIGN={'\u093E':'aa','\u093F':'i','\u0940':'ee','\u0941':'u','\u0942':'oo','\u0943':'ri','\u0947':'e','\u0948':'ai','\u094B':'o','\u094C':'au'};
+  var MARK={'\u0902':'*','\u0901':'**','\u0903':':'};
+  function parseUnits(u){
+    var units=[], i=0, c, base, stem, n;
+    while(i<u.length){
+      c=u[i]; base=null;
+      if(u.substr(i,3)==='\u0915\u094D\u0937'){base='\u0915\u094D\u0937'; stem='ksh'; i+=3}
+      else if(u.substr(i,3)==='\u091C\u094D\u091E'){base='\u091C\u094D\u091E'; stem='gy'; i+=3}
+      else if(STEM[c]){base=c; stem=STEM[c]; i++}
+      if(base){
+        n=u[i];
+        if(n==='\u094D'){
+          if(u[i+1]==='\u200D'){
+            if(base!=='\u0930') return null;
+            units.push({u:base+'\u094D\u200D',r:'rr'}); i+=2;
+          } else {units.push({u:base+'\u094D',r:stem}); i++}
+        } else if(n&&SIGN[n]){units.push({u:base+n,r:stem+SIGN[n]}); i++}
+        else units.push({u:base,r:stem+'a',inh:true});
+        continue;
+      }
+      if(VOW[c]){units.push({u:c,r:VOW[c]}); i++; continue}
+      if(MARK[c]){units.push({u:c,r:MARK[c]}); i++; continue}
+      return null;                                   // something the Roman typing cannot produce
+    }
+    for(i=0;i<units.length-1;i++){                   // half consonant + \u0930\u093F  ->  "<stem>ri^"  (\u092A\u094D\u0930\u093F = pri^)
+      if(units[i].u.slice(-1)==='\u094D'&&units[i].r!=='rr'&&units[i+1].u==='\u0930\u093F')
+        units.splice(i,2,{u:units[i].u+'\u0930\u093F',r:units[i].r+'ri^'});
+    }
+    return units;
+  }
+  function nonSmart(r){return NepaliUnicode.toNepali(r,{smart:false}).replace(/ $/,'').split(':').join('\u0903')}
+  // Join the pieces; add "/" only where two neighbours would otherwise be read as one letter (k+ha = kha).
+  function buildRoman(units){
+    var rom='', uni='', k, r, t;
+    for(k=0;k<units.length;k++){
+      r=units[k].r; t=rom+r;
+      if(nonSmart(t)!==uni+units[k].u){
+        t=rom+'/'+r;
+        if(nonSmart(t)!==uni+units[k].u) return null;
+      }
+      rom=t; uni+=units[k].u;
+    }
+    return rom;
+  }
+  function romanCandidates(units){
+    var full=buildRoman(units); if(full===null||full==='') return [];
+    var c=[full];
+    if(smart.checked){
+      if(units[units.length-1].inh) c.push(full.slice(0,-1));   // Smart mode adds the final "a" itself: ghara -> ghar
+      c.push('['+full+']');                                       // last resort: smart mode switched off for this word
+    }
+    return c;
+  }
+  function roundTrip(cand,kantWord){
+    var uni=NepaliUnicode.toNepali(cand,{smart:smart.checked}).trim();
+    return uni!==''&&!/\s/.test(uni)&&Kantipur.convert(uni)===kantWord;
+  }
+  function romanFor(e,w){
+    if(!e||e.ti<0||e.base===null) return null;
+    var toks=inTokens(inp.value), tk=toks[e.ti];
+    if(!tk||tk.s!==e.typed) return null;                          // typed text changed since the popup was built
+    var uni=Kantipur.reverse(w);
+    if(!uni||Kantipur.convert(uni)!==w) return null;
+    var units=parseUnits(uni); if(!units) return null;
+    var c=romanCandidates(units);
+    for(var i=0;i<c.length;i++) if(roundTrip(c[i],w)) return {rom:c[i],at:tk};
+    return null;
+  }
+  function applyRoman(rr){
+    var tk=rr.at, R=rr.rom;
+    fixedRoman.add(R);
+    inp.focus(); inp.setSelectionRange(tk.i,tk.i+tk.s.length);
+    var ok=false; try{ok=document.execCommand('insertText',false,R)}catch(x){}   // keeps Ctrl+Z working
+    if(!ok||inp.value.substr(tk.i,R.length)!==R) inp.value=inp.value.slice(0,tk.i)+R+inp.value.slice(tk.i+tk.s.length);
+    var end=tk.i+R.length; inp.setSelectionRange(end,end);
+    convert();
+  }
 
   // ---- suggestion popup (click any word; hover only works on underlined words) ----
   // The textarea keeps all its normal behaviour (selecting, double-click...). To know which
@@ -946,8 +1101,14 @@ function preprocess(text){
     tipList.textContent=''; tipUndo.textContent='';
     list.forEach(function(w){
       var b=document.createElement('button'); b.type='button'; b.textContent=w; b.disabled=!can;
-      // replace this word in the Nepali output; the typed word that made it gets underlined
-      b.addEventListener('click',function(){overrides.set(e.base+e.ri,w); closeTip(); convert(); say('Word replaced')});
+      // Pick a word: first try to write it back into the typed text as Roman (yellow underline);
+      // if that is not possible, replace it in the Nepali output only (red underline on the typed word).
+      b.addEventListener('click',function(){
+        var rr=romanFor(e,w);
+        closeTip();
+        if(rr){applyRoman(rr); say('Word replaced · Roman text updated')}
+        else{overrides.set(e.base+e.ri,w); convert(); say('Word replaced')}
+      });
       tipList.appendChild(b);
     });
     if(e.state==='fixed'&&can){
@@ -1002,7 +1163,7 @@ function preprocess(text){
     var r=kant.checked?renderKant(src,uni):{text:uni,entries:[],miss:0};
     out.value=r.text;
     paintSpell(r);
-    paintInput(src,r.toks,r.marked);
+    paintInput(src,r.toks,r.marked,r.yellow);
     status.textContent=countText();
   }
 
@@ -1026,11 +1187,12 @@ function preprocess(text){
   kant.addEventListener('change',setFont);
 
   inp.addEventListener('input',convert);
-  smart.addEventListener('change',convert);
+  // Roman words written by a picked suggestion were checked against the current Smart setting, so forget them when it changes.
+  smart.addEventListener('change',function(){fixedRoman.clear(); convert();});
 
   $('clear').addEventListener('click',function(){
     if(inp.value.length>=30 && !confirm('Clear everything you typed?')) return;
-    inp.value=''; overrides.clear(); convert(); inp.focus();
+    inp.value=''; overrides.clear(); fixedRoman.clear(); convert(); inp.focus();
   });
 
   var flash;
