@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nepali Unicode Converter – type in Roman, get Devanagari</title>
+<style>
+:root{
+  --bg:#eef1f7; --panel:#fff; --ink:#1b2438; --muted:#5d6980; --line:#cfd6e4;
+  --brand:#233a73; --brand-ink:#fff; --accent:#c8102e; --focus:#2f6df6; --yellow:#e0a800;
+  --out-bg:#f7f9fd; --miss:#d91e2e;
+  --deva:"Noto Sans Devanagari","Nirmala UI","Kohinoor Devanagari","Mangal","Lohit Devanagari",sans-serif;
+  --latin:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#10162a; --panel:#182040; --ink:#e8ecf7; --muted:#9aa6c2; --line:#2e3a63;
+    --brand:#7f9cf5; --brand-ink:#0d1226; --accent:#ff5a73; --focus:#8fb0ff; --out-bg:#131a35; --miss:#ff5c66; --yellow:#ffd43b;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 var(--latin);min-height:100%}
+.wrap{max-width:1040px;margin:0 auto;padding:28px 18px 48px}
+.panes{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:760px){.panes{grid-template-columns:1fr}}
+.pane{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.pane label,.pane .cap{font-weight:600;font-size:14px;color:var(--muted)}
+textarea{width:100%;min-height:260px;resize:vertical;border:1px solid var(--line);border-radius:6px;padding:12px;background:var(--panel);color:var(--ink);font:18px/1.6 var(--latin)}
+.hl{position:relative;display:flex;background:var(--out-bg);border-radius:6px}
+#out,#mirror{font:22px/1.7 var(--deva)}
+#out{position:relative;z-index:1;flex:1;background:transparent}
+#mirror,#imirror{position:absolute;inset:0;margin:0;padding:12px;border:1px solid transparent;overflow:hidden;white-space:pre-wrap;overflow-wrap:break-word;color:transparent;pointer-events:none}
+.hl-in{background:var(--panel)}
+#in{position:relative;z-index:1;flex:1;background:transparent}
+#imirror{font:18px/1.6 var(--latin)}
+#mirror mark,#imirror mark{background:none;color:transparent;text-decoration-line:underline;text-decoration-style:wavy;text-decoration-color:var(--miss);text-decoration-thickness:2px;text-underline-offset:.18em}
+#imirror mark.y{text-decoration-color:var(--yellow)}
+@font-face{font-family:"KantipurWeb";src:url("Kantipur%20Regular.ttf") format("truetype");font-display:swap}
+#out[data-font="kantipur"],#mirror[data-font="kantipur"]{font-family:"KantipurWeb",monospace;font-size:26px;line-height:1.6}
+.warn{margin:10px 0 0;color:var(--accent);font-size:14px}
+.warn:empty{display:none}
+#tip{position:fixed;z-index:50;display:block;max-width:min(92vw,380px);background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 28px rgba(15,25,60,.22);padding:10px 12px}
+#tip[hidden]{display:none}
+#tiphead{font-size:13px;color:var(--muted);margin-bottom:8px}
+#tiplist{display:flex;flex-wrap:wrap;gap:6px}
+#tiplist button{font:24px/1.3 "KantipurWeb",monospace;font-weight:400;padding:3px 10px;background:var(--out-bg);color:var(--ink);border:1px solid var(--line)}
+#tiplist button:hover{border-color:var(--brand)}
+#tipnote{font-size:12px;color:var(--accent);margin-top:8px}
+#tipnote:empty{display:none}
+#tipundo{margin-top:8px}
+#tipundo:empty{display:none}
+#tipundo button{padding:4px 10px;font-size:13px}
+.spell{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-top:10px;font-size:14px;color:var(--muted)}
+.spell[hidden]{display:none}
+.spell button{padding:5px 12px;font-size:13px}
+textarea:focus,button:focus-visible,summary:focus-visible,input:focus-visible{outline:3px solid var(--focus);outline-offset:1px}
+.bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-top:14px}
+button{font:600 14px var(--latin);padding:9px 16px;border-radius:6px;border:1px solid var(--brand);background:var(--brand);color:var(--brand-ink);cursor:pointer}
+button.ghost{background:transparent;color:var(--brand)}
+button:hover{filter:brightness(1.08)}
+.opt{display:flex;gap:7px;align-items:center;font-size:14px;cursor:pointer}
+.opt input{width:17px;height:17px;accent-color:var(--brand)}
+.opt.off{opacity:.5;cursor:not-allowed}
+.opt.off input{cursor:not-allowed}
+.stat{margin-left:auto;font-size:13px;color:var(--muted)}
+details{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px 16px}
+summary{cursor:pointer;font-weight:600;padding:12px 0}
+.hint{font-weight:400;color:var(--muted);font-size:14px}
+#guide h3{margin:18px 0 2px;font-size:16px}
+#guide p{margin:0 0 10px;color:var(--muted);font-size:14px;max-width:70ch}
+.ref{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;padding-bottom:6px}
+.ref button{display:flex;justify-content:space-between;align-items:baseline;gap:10px;text-align:left;background:var(--out-bg);color:var(--ink);border:1px solid var(--line);font-weight:500}
+.ref .r{font-family:ui-monospace,Consolas,monospace;font-size:13px;overflow-wrap:anywhere}
+.ref .d{font:18px var(--deva);text-align:right}
+.ref .n{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+#guide{padding-bottom:12px}
+.footnav{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:28px}
+a.btn{display:inline-block;font:600 14px var(--latin);padding:10px 20px;border-radius:6px;border:1px solid var(--brand);background:var(--brand);color:var(--brand-ink);text-decoration:none}
+a.btn:hover{filter:brightness(1.08)}
+a.btn:focus-visible{outline:3px solid var(--focus);outline-offset:1px}
+@media (prefers-reduced-motion:no-preference){button{transition:filter .15s}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <main>
+    <div class="panes">
+      <section class="pane">
+        <label for="in">Romanized Nepali</label>
+        <div class="hl hl-in"><div id="imirror" aria-hidden="true"></div><textarea id="in" spellcheck="false" autofocus placeholder="namaste, mero naam raam ho."></textarea></div>
+      </section>
+      <section class="pane">
+        <label for="out">Nepali Unicode</label>
+        <div class="hl"><div id="mirror" aria-hidden="true"></div><textarea id="out" readonly placeholder="नमस्ते, मेरो नाम राम हो ।"></textarea></div>
+      </section>
+    </div>
+
+    <div class="bar">
+      <button id="copy" type="button">Copy Nepali text</button>
+      <button id="clear" type="button" class="ghost">Clear</button>
+      <label class="opt"><input id="smart" type="checkbox" checked> Smart converter</label>
+      <label class="opt"><input id="kant" type="checkbox"> Kantipur</label>
+      <label class="opt off" id="spellopt" title="CheckSpell is available only when Kantipur is enabled"><input id="spell" type="checkbox" disabled> CheckSpell</label>
+      <span class="stat" id="status" role="status" aria-live="polite"></span>
+    </div>
+
+    <p id="fontwarn" class="warn" role="alert"></p>
+    <div id="spellrow" class="spell" hidden>
+      <span id="spellinfo" role="status"></span>
+      <button id="dictbtn" type="button" class="ghost">Load eligible.txt…</button>
+      <input id="dictfile" type="file" accept=".txt,text/plain" hidden>
+    </div>
+
+    <details open>
+      <summary>Typing guide <span class="hint">– click any example to add it to your text</span></summary>
+      <div id="guide"></div>
+    </details>
+
+    <nav class="footnav"><a class="btn" href="unitokanti.htm">UNICODE TO KANTIPUR</a><a class="btn" href="kantipurproofread.htm">KANTIPUR PROOFREAD</a></nav>
+  </main>
+</div>
+
+<div id="tip" role="dialog" aria-label="Related words" hidden>
+  <div id="tiphead"></div><div id="tiplist"></div><div id="tipnote"></div><div id="tipundo"></div>
+</div>
+
+<script>
+/**
+ * nepali-unicode.js
+ * Romanized Nepali -> Devanagari (Unicode) converter.
+ *
+ * Extracted and de-obfuscated from the inline, eval-packed script on the
+ * "Nepali Unicode Converter" web page. Behaviour is intended to match the
+ * original (see "Differences" at the bottom). No dependencies; works in the
+ * browser (global `NepaliUnicode`) and in Node/CommonJS.
+ *
+ *   NepaliUnicode.toNepali('namaste')                      // smart mode on (default)
+ *   NepaliUnicode.toNepali('namaste', { smart: false })    // plain table lookup
+ *   NepaliUnicode.toNepali('ram', { html: true })          // "&#2352;&#2366;&#2350;"
+ *
+ * Input conventions (same as the original page):
+ *   {text}   keep `text` as-is (e.g. English words)
+ *   [text]   (smart mode only) convert `text` with smart mode temporarily off
+ *   \        explicit halant (virama), e.g. "k\" -> "क्"
+ *   *  **    anusvara (ं) / chandrabindu (ँ)
+ *   .        danda (।)
+ *   T D N Sh  capital letters are significant (retroflex ट ड ण, and ष)
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.NepaliUnicode = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  // ---------------------------------------------------------------- tables
+
+  const HALANT = '\u094D'; // ्
+  const ZWJ = '\u200D';
+
+  // Vowel signs (matras) attached to a consonant.
+  const MATRA = {
+    a: '\u093E',  // ा  (consonant + "a" -> long aa sound, e.g. "kaa")
+    i: '\u093F',  // ि
+    ee: '\u0940', // ी
+    u: '\u0941',  // ु
+    oo: '\u0942', // ू
+    ri: '\u0943', // ृ
+    e: '\u0947',  // े
+    ai: '\u0948', // ै
+    o: '\u094B',  // ो
+    au: '\u094C', // ौ
+  };
+
+  // Base consonants, keyed by their "…a" romanization. Order matters: the
+  // expansion loop below uses "first definition wins".
+  const CONSONANTS = [
+  ['ba', 'ब'],
+  ['bha', 'भ'],
+  ['ca', 'क'],
+  ['cha', 'च'],
+  ['chha', 'छ'],
+  ['Da', 'ड'],
+  ['da', 'द'],
+  ['dha', 'ध'],
+  ['Dha', 'ढ'],
+  ['fa', 'फ'],
+  ['ga', 'ग'],
+  ['gha', 'घ'],
+  ['gya', 'ज्ञ'],
+  ['ha', 'ह'],
+  ['ja', 'ज'],
+  ['jha', 'झ'],
+  ['ka', 'क'],
+  ['kha', 'ख'],
+  ['ksha', 'क्ष'],
+  ['la', 'ल'],
+  ['ma', 'म'],
+  ['Na', 'ण'],
+  ['na', 'न'],
+  ['Nepala', 'नेपाल'],
+  ['nga', 'ङ'],
+  ['pa', 'प'],
+  ['pha', 'फ'],
+  ['qa', 'क'],
+  ['ra', 'र'],
+  ['sa', 'स'],
+  ['sha', 'श'],
+  ['Sha', 'ष'],
+  ['ta', 'त'],
+  ['Ta', 'ट'],
+  ['Tha', 'ठ'],
+  ['tha', 'थ'],
+  ['va', 'व'],
+  ['wa', 'व'],
+  ['xa', 'क्स'],
+  ['ya', 'य'],
+  ['yna', 'ञ'],
+  ['za', 'ज'],
+  ];
+
+  // Everything that is not generated from CONSONANTS.
+  const BASE = {
+    '*': '\u0902',   // ं
+    '**': '\u0901',  // ँ
+    '.': '\u0964',   // ।
+    '\\': HALANT,    // explicit halant
+    0: '\u0966', 1: '\u0967', 2: '\u0968', 3: '\u0969', 4: '\u096A',
+    5: '\u096B', 6: '\u096C', 7: '\u096D', 8: '\u096E', 9: '\u096F',
+    a: 'अ', aa: 'आ', ai: 'ऐ', am: 'अ' + HALANT, au: 'औ', aum: 'ॐ',
+    e: 'ए', i: 'इ', ii: 'ई', o: 'ओ', om: 'ॐ', oo: 'ऊ', u: 'उ',
+    rri: 'ऋ', rree: 'ॠ',
+    rr: 'र' + HALANT + ZWJ,   // eye-lash ra (र्‍)
+    'ri^': HALANT + 'र' + 'ि', // "ri^" -> ्रि
+  };
+
+  /**
+   * Build the full lookup table. For every consonant "Xa" this adds:
+   *   Xa -> C            (inherent vowel)         Xaa -> C+ा
+   *   Xi, Xee, Xu, Xoo, Xri, Xe, Xai, Xo, Xau -> C + matra
+   *   X  -> C + ्         (bare consonant = half form)
+   * Existing keys are never overwritten.
+   */
+  function buildTable() {
+    const t = Object.create(null); // no inherited keys like "constructor"
+    for (const k of Object.keys(BASE)) t[k] = BASE[k];
+
+    for (const [key, val] of CONSONANTS) {
+      const stem = key.slice(0, -1); // "ka" -> "k"
+      const add = (k, v) => { if (!t[k]) t[k] = v; };
+      add(key, val);
+      add(key + 'a', val + MATRA.a);
+      add(stem + 'i', val + MATRA.i);
+      add(stem + 'ee', val + MATRA.ee);
+      add(stem + 'u', val + MATRA.u);
+      add(stem + 'oo', val + MATRA.oo);
+      add(stem + 'ri', val + MATRA.ri);
+      add(stem + 'e', val + MATRA.e);
+      add(stem + 'ai', val + MATRA.ai);
+      add(stem + 'o', val + MATRA.o);
+      add(stem + 'au', val + MATRA.au);
+      add(stem, val + HALANT);
+    }
+    return t;
+  }
+
+  const TABLE = buildTable();
+
+  // Smart mode: whole-word overrides (matched on the raw, case-sensitive word).
+  const WORD_OVERRIDES = new Map([
+    ['cha', 'chha'], ['chu', 'chhu'], ['chha', 'chha'],
+    ['ma', 'ma'], ['aba', 'aba'], ['nam', 'naam'], ['ram', 'raam'],
+    ['pani', 'pani'], ['lai', 'laaii'], ['pai', 'paaii'],
+    ['dai', 'daaii'], ['bhai', 'bhaaii'],
+  ]);
+
+  // ------------------------------------------------------------- internals
+
+  const isVowel = (c) => !!c && 'aeiou'.includes(c.toLowerCase()) && c.length === 1;
+
+  /**
+   * Convert the output of a table hit to a string.
+   * `isLast` = nothing (but whitespace / one trailing "\") remains after this
+   * chunk in the word. In smart mode a trailing halant is dropped there, so
+   * "ram" -> राम not राम्. Single-character values (e.g. "\" itself) are kept.
+   */
+  function render(value, isLast, smart, html) {
+    let v = value;
+    if (isLast && smart && v.length > 1 && v.endsWith(HALANT)) v = v.slice(0, -1);
+    if (!html) return v;
+    let out = '';
+    for (const ch of v) out += '&#' + ch.codePointAt(0) + ';';
+    return out;
+  }
+
+  /** Greedy longest-prefix conversion of one slash-free chunk. */
+  function convertChunk(s, smart, html) {
+    // Protect the case-sensitive letters (T D N Sh), lowercase the rest.
+    let rest = s
+      .replace(/T/g, '^^t^^').replace(/D/g, '^^d^^').replace(/N/g, '^^n^^')
+      .replace(/SH/g, '^^sh^^').replace(/Sh/g, '^^sh^^')
+      .toLowerCase()
+      .replace(/\^\^t\^\^/g, 'T').replace(/\^\^d\^\^/g, 'D')
+      .replace(/\^\^n\^\^/g, 'N').replace(/\^\^sh\^\^/g, 'Sh');
+
+    let out = '';
+    let head = rest;   // candidate prefix currently being tried
+    let tail = '';     // what has been cut off the end of `head`
+    while (head.length > 0) {
+      const hit = TABLE[head];
+      if (hit || head.length <= 1) {
+        if (hit) {
+          const isLast = !(tail.replace(/^\s+|\s+|\\$/, '').length > 0);
+          out += render(hit, isLast, smart, html);
+        } else {
+          out += head; // unmapped character: pass through
+        }
+        head = tail;
+        tail = '';
+      } else {
+        tail = head.charAt(head.length - 1) + tail;
+        head = head.substring(0, head.length - 1);
+      }
+    }
+    return out.length === 0 ? s : out;
+  }
+
+  /** Smart-mode spelling fix-ups applied to a single space-delimited word. */
+  function smartAdjust(word) {
+    if (WORD_OVERRIDES.has(word)) return WORD_OVERRIDES.get(word);
+    if (word.length <= 3) return word;
+
+    const n = word.length;
+    const c0 = word[n - 1].toLowerCase();
+    const c1 = word[n - 2].toLowerCase();
+    const c2 = word[n - 3].toLowerCase();
+    const c3 = word[n - 4].toLowerCase();
+
+    if ((c0 === 'a' || c0 === 'e' || c0 === 'u') && c1 === 'h' && c2 === 'c') {
+      word = word.slice(0, n - 3) + 'chh' + c0;            // …cha -> …chha
+    } else if (c0 === 'y') {
+      word = word.slice(0, n - 1) + 'ree';                  // …y   -> …ree
+    } else if (c0 === 'a' && c1 === 'h' && c2 === 'h') {
+      /* …hha: leave alone */
+    } else if (c0 === 'a' && c1 === 'n' && (c2 === 'k' || c2 === 'h' || c2 === 'r')) {
+      /* …kna / …hna / …rna: leave alone */
+    } else if (c0 === 'a' && c1 === 'r' && c2 === 'd' && c3 === 'n') {
+      /* …ndra: leave alone */
+    } else if (c0 === 'a' && c1 === 'r' && c2 === 't' && c3 === 'n') {
+      /* …ntra: leave alone */
+    } else if (
+      c0 === 'a' &&
+      (c1 === 'm' || (!isVowel(c1) && !isVowel(c3) && c1 !== 'y' && c2 !== 'e'))
+    ) {
+      word += 'a';                                          // add the long "aa"
+    }
+    if (c0 === 'i' && !isVowel(c1)) word = word.slice(0, -1) + 'ee'; // …Ci -> …Cee
+    return word;
+  }
+
+  /** Convert a run of text (words separated by single spaces). */
+  function convertWords(text, smart, html) {
+    if (smart) text = text.replace(/\s*\./g, ' .').replace(/\s*\?/g, ' ?');
+    const words = text.split(' ');
+    let out = '';
+    for (let w of words) {
+      w = w.replace(/ri\^/g, 'ari^');
+      if (smart) w = smartAdjust(w);
+      for (const sub of w.split('/')) {      // "/" splits a word without a space
+        if (sub.length !== 0) out += convertChunk(sub, smart, html);
+      }
+      out += ' ';
+    }
+    return out;
+  }
+
+  /**
+   * Replace delimited spans ({…} or […]) with placeholders so they can be
+   * handled separately. Mirrors the original's scan, including an unclosed
+   * opener running to the end of the input.
+   */
+  function maskSpans(input, open, close, counter, onSpan) {
+    let begin = 0, end = -1;
+    while (begin > -1 && end < input.length - 1) {
+      begin = input.indexOf(open, end + 1);
+      if (begin > -1) {
+        end = input.indexOf(close, begin + 1);
+        if (end === -1) end = input.length - 1;
+        const token = input.substring(begin, end + 1);
+        const mask = '$-' + counter.n + '-$';
+        onSpan(mask, token.substring(1, token.length - 1));
+        input = input.replace(token, () => mask);
+        end = end - token.length + mask.length;
+        counter.n++;
+      }
+    }
+    return input;
+  }
+
+  // ---------------------------------------------------------------- public
+
+  /**
+   * @param {string} input
+   * @param {{smart?: boolean, html?: boolean}} [opts]  smart defaults to true
+   * @returns {string}
+   */
+  function toNepali(input, opts) {
+    const smart = !opts || opts.smart === undefined ? true : !!opts.smart;
+    const html = !!(opts && opts.html);
+    const counter = { n: 1 };
+
+    const literal = Object.create(null);     // {…} spans: copied verbatim
+    input = maskSpans(input, '{', '}', counter, (m, text) => { literal[m] = text; });
+
+    const plain = Object.create(null);       // […] spans: smart mode off
+    if (smart) {
+      input = maskSpans(input, '[', ']', counter, (m, text) => {
+        plain[m] = convertWords(text, false, html);
+      });
+    }
+
+    let out = convertWords(input, smart, html);
+
+    const maskKey = (m) => convertWords(m, smart, html).replace(' ', '');
+    if (smart) {
+      for (const m in plain) {
+        out = out.replace(maskKey(m), () => plain[m].replace(/\s$/, ''));
+      }
+    }
+    for (const m in literal) {
+      out = out.replace(maskKey(m), () => literal[m]);
+    }
+    return out;
+  }
+
+  return { toNepali, TABLE };
+
+  // Differences from the original page script (intentional):
+  //  * Lookup tables use prototype-less objects/Map, so words like
+  //    "constructor" or "__proto__" no longer break the converter.
+  //  * {…} / […] replacements use function replacers, so "$&", "$1" etc.
+  //    inside those spans are copied literally instead of being interpreted.
+  //  * The original's unused "special word" (sW) mechanism is dropped; it was
+  //    never populated, so it had no effect.
+});
+
+</script>
+<script>
+/* Unicode -> Kantipur/Preeti legacy encoding. CORE block copied unchanged from unicode_to_kantipur_logic.htm */
+var Kantipur=(function(){
+// ==== CORE ====
+const ARRAY_ONE = ["‘", "?", "क़", "ख़", "ग़", "ज़", "ड़", "ढ़", "फ़", "ॐ", "ऽ", "।", "m'", "m]", "mfF", "mF", "०", "१", "२", "३", "४", "५", "६", "७", "८", "९", "फ्र", "झ", "फ", "क्त", "क्र", "ल", "ज्ञ्", "द्घ", "ज्ञ", "द्द", "द्ध", "श्र", "रु", "द्य", "क्ष्", "क्ष", "त्त", "द्म", "त्र", "ध्र", "ङ्घ", "ड्ड", "द्र", "ट्ट", "ड्ढ", "ठ्ठ", "रू", "हृ", "ङ्ग", "त्र", "ङ्क", "ङ्ख", "ट्ठ", "द्व", "ट्र", "ठ्र", "ड्र", "ढ्र", "्र", "ड़", "ढ़", "क्", "क", "ख्", "ख", "ग्", "ग", "घ्", "घ", "ङ", "च्", "च", "छ", "ज्", "ज", "झ्", "झ", "ञ्", "ञ", "ट", "ठ", "ड", "ढ", "ण्", "ण", "त्", "त", "थ्", "थ", "द", "ध्", "ध", "न्", "न", "प्", "प", "फ्", "ब्", "ब", "भ्", "भ", "म्", "म", "य", "र", "ल्", "ल", "व्", "व", "श्", "श", "ष्", "ष", "स्", "स", "ह्", "ह", "्य", "ऑ", "ऑ", "औ", "ओ", "आ", "अ", "ई", "इ", "ऊ", "उ", "ऋ", "ऐ", "ए", "ॉ", "ू", "ु", "ं", "ा", "ृ", "्", "े", "ै", "ँ", "ी", "ः", "ो", "ौ"];
+const ARRAY_TWO = ["…", "<", "क़", "ख़", "ग़", "ज़", "ड़", "ढ़", "फ़", "ç", "˜", ".", "'m", "]m", "Fmf", "Fm", ")", "!", "@", "#", "$", "%", "^", "&", "*", "(", "k|m", "em", "km", "St", "qm", "n", "¡", "b\\3", "1", "2", "4", ">", "?", "B", "I", "If", "Q", "ß", "q", "„", "‹", "•", "ı", "§", "°", "¶", "¿", "X", "Ë", "Ì", "Í", "Î", "\uf002", "å", "6«", "7«", "8«", "9«", "|", "8Þ", "9Þ", "S", "s", "V", "v", "U", "u", "£", "3", "ª", "R", "r", "5", "H", "h", "‰", "´", "~", "`", "6", "7", "8", "9", "0", "0f", "T", "t", "Y", "y", "b", "W", "w", "G", "g", "K", "k", "Ï", "A", "a", "E", "e", "D", "d", "o", "/", "N", "n", "J", "j", "Z", "z", "i", "if", ":", ";", "X", "x", "Ø", "cf‘", "c‘f", "cf}", "cf]", "cf", "c", "O{", "O", "pm", "p", "C", "P]", "P", "f‘", "\"", "'", "+", "f", "[", "\\", "]", "}", "“", "L", "M", "f]", "f}"];
+const MATRAS = "ािीुूृेैोौं:ँॅ";
+const AFTER_MATRAS = "ािीुूृेैोौंःँॅॉ";
+const HALANT = "\u094d";
+const REPH = "\u0930\u094d";
+const CONS = "\u0915-\u0939\u0958-\u095f";
+
+function isConsonant(ch){
+  return ch !== "" && ((ch >= "\u0915" && ch <= "\u0939") || (ch >= "\u0958" && ch <= "\u095f"));
+}
+function charAt(s, i){ return (i >= 0 && i < s.length) ? s[i] : ""; }
+function isMatra(ch){ return ch === "" || MATRAS.indexOf(ch) !== -1; }
+function replaceFirst(s, a, b){
+  const i = s.indexOf(a);
+  return i < 0 ? s : s.slice(0, i) + b + s.slice(i + a.length);
+}
+
+const FINAL_HALANT = new RegExp("([" + CONS + "])\u094d(?![" + CONS + "])", "g");
+const TTA_HALF = new RegExp("\u0924\u094d\u0924\u094d(?=[" + CONS + "])", "g");
+// र् + ZWJ + य (गर्‍यो, भर्‍यो) is the single Preeti glyph ¥. Must run before the reph logic,
+// otherwise the ZWJ stops the reph from finding its consonant.
+const RA_ZWJ_YA = /\u0930\u094d\u200d(?=\u092f)/g;
+function glyphFor(key){ return ARRAY_TWO[ARRAY_ONE.indexOf(key)]; }
+const HALF_FIRST = [
+  [/\u0932\u094d/g, glyphFor("\u0932\u094d")],           // ल्
+  [/\u092b\u094d(?!\u0930)/g, glyphFor("\u092b\u094d")], // फ् (not फ्र)
+  [/\u091d\u094d/g, glyphFor("\u091d\u094d")]            // झ्
+];
+const M_MATRA = /(km|em|qm)(['"\]}]+)/g;
+const PAIRS = [];
+for (let i = 0; i < ARRAY_ONE.length; i++){
+  const a = ARRAY_ONE[i], b = ARRAY_TWO[i];
+  if (a === "" || a === b) continue;
+  PAIRS.push([a, b]);
+}
+
+function convertCore(text){
+  if (text === "") return text;
+  let s = text;
+
+  // punctuation (before the table, which itself outputs "/", "(" , ")" and "!")
+  s = s.split("/").join("\u00f7");        // / -> ÷
+  s = s.split("!").join("\u03c0");        // ! -> π   (must stay before the table, which outputs "!" for १)
+  s = s.split("-").join("\u2013");        // hyphen -> en dash
+  s = s.split("(").join("-");             // ( -> -   (must stay after the hyphen line)
+  s = s.split(")").join("_");             // ) -> _
+  s = s.split(".").join("=");             // . -> =   (must stay before the table, which outputs "." for the danda)
+  s = s.split("\u2019").join("\u00da");    // closing quote -> Ú
+  s = s.replace(RA_ZWJ_YA, () => "\u00a5"); // र्‍य -> ¥ (then य and the matra follow normally)
+
+  // move the short-i matra in front of its consonant cluster
+  let pos = s.indexOf("\u093f");
+  let guard = 0;
+  while (pos !== -1 && guard < 100000){
+    guard++;
+    const left = charAt(s, pos - 1);
+    s = replaceFirst(s, left + "\u093f", "l" + left);
+    pos -= 1;
+    while (charAt(s, pos - 1) === HALANT && pos !== 0){
+      const chunk = charAt(s, pos - 2) + HALANT;
+      s = replaceFirst(s, chunk + "l", "l" + chunk);
+      pos -= 2;
+    }
+    pos = s.indexOf("\u093f");
+  }
+
+  // chandrabindu goes before the u / uu sign
+  s = s.split("\u0941\u0901").join("\u0901\u0941").split("\u0942\u0901").join("\u0901\u0942");
+
+  // reph: move it to the end of its syllable
+  s += "  ";
+  let start = 0;
+  let halfR = s.indexOf(REPH, start);
+  guard = 0;
+  while (halfR !== -1 && guard < 100000){
+    guard++;
+    let z = halfR + 2;
+    let ch = charAt(s, z);
+    while ((isMatra(ch) || ch === "l") && z < s.length){
+      z++;
+      ch = charAt(s, z);
+    }
+    if (!isConsonant(ch)){
+      start = halfR + 2;
+      halfR = s.indexOf(REPH, start);
+      continue;
+    }
+    let right = z + 1;
+    let rightCh = charAt(s, right);
+    while (rightCh === HALANT){
+      z = right + 1;
+      right = z + 1;
+      rightCh = charAt(s, right);
+    }
+    let end = z;
+    while (charAt(s, end + 1) !== "" && AFTER_MATRAS.indexOf(charAt(s, end + 1)) !== -1) end++;
+    const chunk = s.slice(halfR + 2, end + 1);
+    s = s.slice(0, halfR) + chunk + "{" + s.slice(end + 1);
+    start = halfR;
+    halfR = s.indexOf(REPH, start);
+  }
+  s = s.slice(0, -2);
+
+  // second-round fixes (before the big table)
+  s = s.replace(TTA_HALF, () => "\u0152");
+  s = s.replace(FINAL_HALANT, (m, g) => g + "\\");
+  for (const [rx, glyph] of HALF_FIRST) s = s.replace(rx, () => glyph);
+  s = s.split("\u0919\u094d\u0916\u094d").join("\u00aa\\V");
+
+  // table replacement, in order
+  for (const [a, b] of PAIRS){
+    let g = 0;
+    while (s.indexOf(a) !== -1 && g < 50){
+      g++;
+      s = s.split(a).join(b);
+    }
+  }
+  s = s.replace(M_MATRA, (m, a, b) => a[0] + b + "m");
+  return s;
+}
+
+// speed-ups for big texts: words are converted once and remembered
+const SENTINEL = "\u0000";
+const PIECE = 40;
+const cache = new Map();
+
+function convertPiece(piece){
+  let hit = cache.get(piece);
+  if (hit === undefined){
+    hit = replaceFirst(convertCore(SENTINEL + piece), SENTINEL, "");
+    cache.set(piece, hit);
+  }
+  return hit;
+}
+function cutPoints(word){
+  const cuts = [];
+  for (let i = 0; i < word.length; i++){
+    const c = word[i];
+    if (((c >= "\u0904" && c <= "\u0939") || (c >= "\u0958" && c <= "\u095f")) &&
+        !(i > 0 && "\u094d\u200c\u200d".indexOf(word[i - 1]) !== -1)) cuts.push(i);
+  }
+  return cuts;
+}
+function convertWord(word){
+  const hit = cache.get(word);
+  if (hit !== undefined) return hit;
+  if (word.length <= PIECE * 2) return convertPiece(word);
+  const out = [];
+  let start = 0;
+  for (const c of cutPoints(word)){
+    if (c - start >= PIECE){
+      out.push(convertPiece(word.slice(start, c)));
+      start = c;
+    }
+  }
+  out.push(convertPiece(word.slice(start)));
+  return out.join("");
+}
+// straight single quotes: opening after start / space / bracket / dash, else closing
+const OPEN_Q = /(^|[\s(\[{<"\u201c\u2018\u2013\u2014\/-])'/gm;
+function preprocess(text){
+  return text.replace(OPEN_Q, (m, g) => g + "\u2018").split("'").join("\u2019")
+             .split(":").join("\u0903");   // typed ":" is treated as visarga ः -> M (same length, so highlight positions stay valid)
+}
+
+// ==== REVERSE (Kantipur -> Unicode). Not part of CORE; CORE above is untouched. ====
+const REV = new Map();
+let REV_MAX = 1;
+for (let i = 9; i < ARRAY_ONE.length; i++){
+  if (i >= 12 && i <= 15) continue;
+  const a = ARRAY_ONE[i], b = ARRAY_TWO[i];
+  if (a === "" || b === "" || a === b) continue;
+  if (!REV.has(b)) REV.set(b, a);
+  if (b.length > REV_MAX) REV_MAX = b.length;
+}
+REV.set("X", "\u0939\u094d");              // X is ह् (not हृ)
+REV.set("\u0152", "\u0924\u094d\u0924\u094d");
+REV.set("\u00a5", "\u0930\u094d\u200d");
+function reverse(k){
+  if (!k) return null;
+  k = k.replace(/([keq])(['"\]}]+)m/g, "$1m$2");   // undo the "m goes after the matra" swap
+  const toks = [];
+  for (let i = 0; i < k.length;){
+    const ch = k[i];
+    if (ch === "l" || ch === "{"){ toks.push({t: ch}); i++; continue; }
+    let hit = null;
+    for (let n = Math.min(REV_MAX, k.length - i); n > 0; n--){
+      const g = k.substr(i, n);
+      if (REV.has(g)){ hit = [g.length, REV.get(g)]; break; }
+    }
+    if (!hit) return null;
+    toks.push({t: "u", u: hit[1]});
+    i += hit[0];
+  }
+  let out = "";
+  for (let p = 0; p < toks.length; p++){
+    const tk = toks[p];
+    if (tk.t === "u"){ out += tk.u; continue; }
+    if (tk.t === "l"){                              // short-i comes before its cluster
+      let q = p + 1, cl = "";
+      while (q < toks.length && toks[q].t === "u" && toks[q].u.endsWith(HALANT)){ cl += toks[q].u; q++; }
+      if (q >= toks.length || toks[q].t !== "u") return null;
+      cl += toks[q].u; q++;
+      while (q < toks.length && toks[q].t === "u" && toks[q].u.length > 1 && toks[q].u[0] === HALANT){ cl += toks[q].u; q++; }
+      out += cl + "\u093f";
+      p = q - 1;
+      continue;
+    }
+    let i2 = out.length;                            // "{" = reph goes back before its syllable
+    while (i2 > 0 && AFTER_MATRAS.indexOf(out[i2 - 1]) !== -1) i2--;
+    if (i2 === 0 || !isConsonant(out[i2 - 1])) return null;
+    i2--;
+    while (i2 >= 2 && out[i2 - 1] === HALANT && isConsonant(out[i2 - 2])) i2 -= 2;
+    out = out.slice(0, i2) + REPH + out.slice(i2);
+  }
+  return out;
+}
+
+  return {
+    reverse:reverse,
+    convert:function(text){
+      if(text==='') return '';
+      return preprocess(text).split(/(\s+)/).map(function(tok){
+        return (tok===''||/^\s+$/.test(tok))?tok:convertWord(tok);
+      }).join('');
+    },
+    placeholder:function(text){return preprocess(text).split(' ').map(convertWord).join(' ');}
+  };
+})();
+
+</script>
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id)};
+  var inp=$('in'), out=$('out'), smart=$('smart'), status=$('status');
+
+  var kant=$('kant'), spell=$('spell'), warn=$('fontwarn'), plain=out.placeholder;
+  var mirror=$('mirror'), imirror=$('imirror'), spellrow=$('spellrow'), spellinfo=$('spellinfo');
+  var kantPlaceholder=Kantipur.placeholder('\u0928\u092E\u0938\u094D\u0924\u0947, \u092E\u0947\u0930\u094B \u0928\u093E\u092E \u0930\u093E\u092E \u0939\u094B \u0964');
+
+  // ---- spell check -------------------------------------------------------
+  // eligible.txt holds Kantipur-encoded words, one per line. Every Devanagari
+  // word is converted with the same Kantipur logic and looked up in that list,
+  // CheckSpell is only available while Kantipur is switched on.
+  var dict=null, dictFrom='', dictState='idle', missCount=0, wordKeys=[], wordEls=[];
+  var RUNSPLIT=/([\u0900-\u0963\u0971-\u097F\u200C\u200D]+)/, LETTER=/[\u0904-\u0939\u0958-\u095F]/;
+
+  function decode(buf){
+    var b=new Uint8Array(buf);
+    if(b[0]===0xFF&&b[1]===0xFE) return new TextDecoder('utf-16le').decode(buf);
+    if(b[0]===0xFE&&b[1]===0xFF) return new TextDecoder('utf-16be').decode(buf);
+    try{return new TextDecoder('utf-8',{fatal:true}).decode(buf)}
+    catch(e){return new TextDecoder('windows-1252').decode(buf)}
+  }
+  function parseDict(text){
+    var set=new Set(), lines=text.split(/\r?\n/);
+    for(var i=0;i<lines.length;i++){var l=lines[i].trim(); if(l) set.add(l)}
+    return set;
+  }
+
+  // Saved copy of the word list. IndexedDB, because a list this size will not fit in localStorage.
+  function kv(mode,fn){
+    return new Promise(function(res,rej){
+      if(typeof indexedDB==='undefined') return rej(new Error('no indexedDB'));
+      var o=indexedDB.open('nepaliUnicodeConverter',1);
+      o.onupgradeneeded=function(){o.result.createObjectStore('kv')};
+      o.onerror=function(){rej(o.error)};
+      o.onsuccess=function(){
+        var db=o.result, tx=db.transaction('kv',mode), q=fn(tx.objectStore('kv'));
+        tx.oncomplete=function(){db.close();res(q.result)};
+        tx.onerror=tx.onabort=function(){db.close();rej(tx.error)};
+      };
+    });
+  }
+  function saveDict(text){return kv('readwrite',function(s){return s.put(text,'eligible')}).catch(function(){})}
+  function loadSaved(){return kv('readonly',function(s){return s.get('eligible')}).catch(function(){return null})}
+
+  function useDict(text,from,save){
+    var set=parseDict(text);
+    if(!set.size){dictState='empty';convert();return false}
+    dict=set; dictFrom=from; dictState='ready';
+    buildIndex(set);
+    if(save) saveDict(text);
+    convert(); return true;
+  }
+  function autoLoad(){
+    if(dict||dictState==='loading') return;
+    dictState='loading'; convert();
+    var req=(typeof fetch==='function')?fetch('eligible.txt',{cache:'no-cache'}).then(function(r){
+      if(!r.ok) throw new Error('http '+r.status); return r.arrayBuffer();
+    }):Promise.reject(new Error('no fetch'));
+    req.then(function(buf){
+      if(!useDict(decode(buf),'eligible.txt',true)) throw new Error('empty');
+    }).catch(function(){
+      // Browsers usually refuse to read files next to a page opened from disk (file://).
+      return loadSaved().then(function(saved){
+        if(!(saved&&useDict(saved,'saved copy',false))){dictState='failed';convert();}
+      });
+    });
+  }
+  $('dictbtn').addEventListener('click',function(){$('dictfile').click()});
+  $('dictfile').addEventListener('change',function(e){
+    var f=e.target.files[0]; if(!f) return;
+    f.arrayBuffer().then(function(buf){
+      if(!useDict(decode(buf),f.name,true)) spellinfo.textContent='That file has no words in it.';
+    });
+    e.target.value='';
+  });
+
+  // ---- suggestions (closest dictionary words) ----
+  var byLen=null, sugCache=new Map(), relCache=new Map();
+  var ROWS=[new Int32Array(64),new Int32Array(64),new Int32Array(64)];
+  function buildIndex(set){
+    byLen=new Map(); sugCache=new Map(); relCache=new Map();
+    set.forEach(function(w){var a=byLen.get(w.length); if(!a) byLen.set(w.length,a=[]); a.push(w)});
+  }
+  // Edit distance (insert, delete, replace, swap two neighbours); gives up once it must exceed `max`.
+  function osa(a,b,max){
+    var n=a.length, m=b.length;
+    if(n-m>max||m-n>max) return max+1;
+    var r0=ROWS[0], r1=ROWS[1], r2=ROWS[2], i, j, t, prevBest=0;
+    for(j=0;j<=m;j++) r1[j]=j;
+    for(i=1;i<=n;i++){
+      var ai=a.charCodeAt(i-1), best=r0[0]=i;
+      for(j=1;j<=m;j++){
+        var bj=b.charCodeAt(j-1), v=r1[j-1]+(ai===bj?0:1), x=r1[j]+1, y=r0[j-1]+1;
+        if(x<v) v=x; if(y<v) v=y;
+        if(i>1&&j>1&&ai===b.charCodeAt(j-2)&&a.charCodeAt(i-2)===bj&&r2[j-2]+1<v) v=r2[j-2]+1;
+        r0[j]=v; if(v<best) best=v;
+      }
+      if(i>1&&best>max&&prevBest>max) return max+1;   // a swap can skip one row, so look at two
+      prevBest=best; t=r2; r2=r1; r1=r0; r0=t;
+    }
+    return r1[m];
+  }
+  function suggest(key){
+    var hit=sugCache.get(key); if(hit) return hit;
+    var L=key.length, max=L<=3?1:2, res=[];
+    if(byLen&&L<=30){
+      for(var l=L-max;l<=L+max;l++){
+        var arr=byLen.get(l); if(!arr) continue;
+        for(var i=0;i<arr.length;i++){
+          var w=arr[i], d=osa(key,w,max);
+          if(d>max) continue;
+          var p=0, s=0, k=Math.min(L,w.length);
+          while(p<k&&key.charCodeAt(p)===w.charCodeAt(p)) p++;
+          while(s<k&&key.charCodeAt(L-1-s)===w.charCodeAt(w.length-1-s)) s++;
+          res.push({w:w,d:d,p:p,s:s,l:Math.abs(w.length-L)});
+        }
+      }
+      res.sort(function(x,y){return x.d-y.d||y.p-x.p||y.s-x.s||x.l-y.l||(x.w<y.w?-1:x.w>y.w?1:0)});
+    }
+    var out=res.slice(0,8).map(function(r){return r.w});
+    sugCache.set(key,out); return out;
+  }
+  // Related words for a word that IS in the list: near spellings first, then longer words that
+  // start with it (inflected forms such as a word + its case endings). The word itself is left out.
+  function related(key){
+    var hit=relCache.get(key); if(hit) return hit;
+    var res=suggest(key).filter(function(w){return w!==key});
+    if(res.length<8&&key.length>=3&&dict){
+      var ext=[];
+      dict.forEach(function(w){if(w.length>key.length&&w.lastIndexOf(key,0)===0&&res.indexOf(w)<0) ext.push(w)});
+      ext.sort(function(a,b){return a.length-b.length||(a<b?-1:a>b?1:0)});
+      res=res.concat(ext.slice(0,8-res.length));
+    }
+    relCache.set(key,res); return res;
+  }
+  // ---- end suggestions ----
+
+  function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+  // Words the user replaced from the suggestion popup.
+  // key = typed (romanized) word + SEP + n-th Nepali word it produced + SEP + n-th letter run -> chosen Kantipur word.
+  // Keyed by the typed text, so a replacement survives edits elsewhere and disappears when that typed word is changed.
+  // fixedRoman = Roman words that were written into the typed text by a picked suggestion (yellow underline).
+  var SEP='\u0001', overrides=new Map(), fixedRoman=new Set();
+  var INTOK=/(?:\{[^}]*(?:\}|$)|\[[^\]]*(?:\]|$)|\S)+/g;   // a typed word; {...} spans stay in one piece
+  var cntCache=new Map();
+
+  function inTokens(src){
+    var a=[], m; INTOK.lastIndex=0;
+    while((m=INTOK.exec(src))) a.push({s:m[0],i:m.index});
+    return a;
+  }
+  // How many output words one typed word turns into (normally 1; "ho." gives 2 in smart mode).
+  function outCount(tok){
+    var k=(smart.checked?'s':'p')+tok, c=cntCache.get(k);
+    if(c===undefined){
+      var o=NepaliUnicode.toNepali(tok,{smart:smart.checked}).match(/\S+/g);
+      c=o?o.length:0;
+      if(cntCache.size>20000) cntCache.clear();
+      cntCache.set(k,c);
+    }
+    return c;
+  }
+  // Which typed word produced each output word. null when the counts do not line up.
+  function ownership(toks,total){
+    var owner=[];
+    for(var i=0;i<toks.length;i++){var c=outCount(toks[i].s); for(var j=0;j<c;j++) owner.push({i:i,j:j})}
+    return owner.length===total?owner:null;
+  }
+
+  // Builds the Kantipur output (with the user's replacements applied) and, when CheckSpell is on,
+  // the underlined mirror for it. Also reports which typed words have a replacement.
+  function renderKant(src,uni){
+    var want=spell.checked&&!!dict, parts=uni.split(/(\s+)/), total=0, p;
+    for(p=0;p<parts.length;p++) if(parts[p]!==''&&!/^\s+$/.test(parts[p])) total++;
+    var toks=null, owner=null;
+    if(src&&(overrides.size||spell.checked||fixedRoman.size)){toks=inTokens(src); owner=ownership(toks,total)}
+    var yellow=new Set();
+    if(toks&&fixedRoman.size){
+      var present=new Set();
+      toks.forEach(function(t,i){if(fixedRoman.has(t.s)){yellow.add(i); present.add(t.s)}});
+      fixedRoman.forEach(function(s){if(!present.has(s)) fixedRoman.delete(s)});   // forget words that are no longer typed
+    }
+    var text='', html='', entries=[], miss=0, marked=new Set(), t=0;
+    for(p=0;p<parts.length;p++){
+      var tok=parts[p];
+      if(tok==='') continue;
+      if(/^\s+$/.test(tok)){text+=tok; html+=tok; continue}
+      var ow=owner?owner[t]:null; t++;
+      var base=ow?toks[ow.i].s+SEP+ow.j+SEP:null;
+      var segs=tok.split(RUNSPLIT), runs=[], anyOv=false, ri=0, q, x;
+      for(q=1;q<segs.length;q+=2){
+        if(!LETTER.test(segs[q])) continue;
+        var k=Kantipur.convert(segs[q]).trim();   // dictionary lines are trimmed too, so compare like with like
+        var ov=base!==null?overrides.get(base+ri):undefined;
+        if(ov!==undefined) anyOv=true;
+        runs.push({q:q,k:k,ri:ri,miss:want?!dict.has(k):false,ov:ov});
+        ri++;
+      }
+      var shown;
+      if(anyOv){
+        shown='';
+        for(q=0;q<segs.length;q++){
+          if(segs[q]==='') continue;
+          var r=null;
+          if(q%2) for(x=0;x<runs.length;x++) if(runs[x].q===q) r=runs[x];
+          shown+=(r&&r.ov!==undefined)?r.ov:Kantipur.convert(segs[q]);
+        }
+        marked.add(ow.i);
+      } else shown=Kantipur.convert(tok);
+      text+=shown;
+      if(!want) continue;
+      // the word the popup is about: first one still not found, else a replaced one, else the first
+      var tg=null;
+      for(x=0;x<runs.length&&!tg;x++) if(runs[x].miss&&runs[x].ov===undefined) tg=runs[x];
+      for(x=0;x<runs.length&&!tg;x++) if(runs[x].ov!==undefined) tg=runs[x];
+      if(!tg) tg=runs[0]||null;
+      if(!tg){html+=esc(shown); continue}
+      var st=(tg.miss&&tg.ov===undefined)?'miss':(tg.ov!==undefined?'fixed':'ok');
+      // "simple" = this typed word is one plain Roman word that gave exactly one Nepali word (no punctuation,
+      // no {..} or [..]). Only then can a picked suggestion be written back into the typed text as Roman.
+      var simple=!!(ow&&runs.length===1&&segs.length===3&&segs[0]===''&&segs[2]===''&&
+                    /^[A-Za-z\\*\/\^:]+$/.test(toks[ow.i].s)&&outCount(toks[ow.i].s)===1);
+      var idx=entries.push({k:tg.k,ri:tg.ri,base:base,miss:tg.miss,state:st,
+                            ti:simple?ow.i:-1,typed:simple?toks[ow.i].s:''})-1;
+      if(st==='miss'){miss++; html+='<mark data-i="'+idx+'">'+esc(shown)+'</mark>'}   // underlined
+      else html+='<span data-i="'+idx+'">'+esc(shown)+'</span>';                      // known or replaced word: no underline
+    }
+    return {text:text,html:want?html:undefined,entries:entries,miss:miss,marked:marked,yellow:yellow,toks:toks};
+  }
+
+  function syncOne(ta,m){
+    // match the wrapping width of the textarea (its scrollbar, if any, narrows the text area)
+    var sb=Math.max(0,ta.offsetWidth-ta.clientWidth-2);
+    m.style.paddingRight=(12+sb)+'px';
+    m.scrollTop=ta.scrollTop;
+  }
+  function syncMirror(){syncOne(out,mirror); syncOne(inp,imirror)}
+
+  // Wavy underline in the typed (Roman) text:
+  //   red    = the Nepali word was replaced by a picked suggestion, but it could not be written back as Roman
+  //   yellow = the picked suggestion was converted back to Roman and now sits in the typed text
+  function paintInput(src,toks,marked,yellow){
+    var anyRed=marked&&marked.size, anyYel=yellow&&yellow.size;
+    if(!(anyRed||anyYel)||!toks){imirror.textContent=''; return}
+    var html='', pos=0;
+    toks.forEach(function(t,i){
+      html+=esc(src.slice(pos,t.i));
+      html+=(marked&&marked.has(i))?'<mark>'+esc(t.s)+'</mark>'
+           :(yellow&&yellow.has(i))?'<mark class="y">'+esc(t.s)+'</mark>'
+           :esc(t.s);
+      pos=t.i+t.s.length;
+    });
+    imirror.innerHTML=html+esc(src.slice(pos))+'\n';
+    syncOne(inp,imirror);
+  }
+
+  function paintSpell(r){
+    var on=spell.checked&&kant.checked;
+    spellrow.hidden=!on;
+    closeTip(); missCount=r.miss||0; wordKeys=r.entries||[]; wordEls=[];
+    if(on&&dict&&r.html!==undefined){
+      mirror.innerHTML=r.html+'\n';
+      wordEls=mirror.querySelectorAll('mark,span[data-i]');   // reading order
+    } else mirror.textContent='';
+    if(!wordEls.length) out.style.cursor='';
+    if(on){
+      var fixed=r.marked?r.marked.size:0, yel=r.yellow?r.yellow.size:0;
+      spellinfo.textContent=
+        dictState==='ready'?'Dictionary: '+dict.size.toLocaleString()+' words ('+dictFrom+') · '+missCount.toLocaleString()+' not found'+(fixed?' · '+fixed.toLocaleString()+' replaced (red underline: could not be converted to Roman)':'')+(yel?' · '+yel.toLocaleString()+' converted back to Roman (yellow underline)':'')+(wordKeys.length?'. Click any word, or hover an underlined one, to see other words and replace it.':''):
+        dictState==='loading'?'Loading eligible.txt…':
+        dictState==='empty'?'eligible.txt has no words in it.':
+        'Could not open eligible.txt automatically (browsers block this for pages opened from disk). Choose the file once and it will be remembered.';
+    }
+    syncMirror();
+  }
+  out.addEventListener('scroll',syncMirror);
+  inp.addEventListener('scroll',syncMirror);
+  if(typeof ResizeObserver==='function'){var ro=new ResizeObserver(syncMirror); ro.observe(out); ro.observe(inp)}
+  spell.addEventListener('change',function(){if(spell.checked) autoLoad(); convert();});
+
+  // ---- picked Kantipur word -> Romanized Nepali ----
+  // When a suggestion is picked, the page tries to turn it back into Roman letters and write those into the
+  // typed text. A candidate is only accepted if the page's own converters turn it back into exactly the picked word.
+  var STEM={'क':'k','ख':'kh','ग':'g','घ':'gh','ङ':'ng','च':'ch','छ':'chh','ज':'j','झ':'jh','ञ':'yn','ट':'T','ठ':'Th','ड':'D','ढ':'Dh','ण':'N','त':'t','थ':'th','द':'d','ध':'dh','न':'n','प':'p','फ':'ph','ब':'b','भ':'bh','म':'m','य':'y','र':'r','ल':'l','व':'w','श':'sh','ष':'Sh','स':'s','ह':'h'};
+  var VOW={'\u0905':'a','\u0906':'aa','\u0907':'i','\u0908':'ii','\u0909':'u','\u090A':'oo','\u090B':'rri','\u0960':'rree','\u090F':'e','\u0910':'ai','\u0913':'o','\u0914':'au','\u0950':'om'};
+  var SIGN={'\u093E':'aa','\u093F':'i','\u0940':'ee','\u0941':'u','\u0942':'oo','\u0943':'ri','\u0947':'e','\u0948':'ai','\u094B':'o','\u094C':'au'};
+  var MARK={'\u0902':'*','\u0901':'**','\u0903':':'};
+  function parseUnits(u){
+    var units=[], i=0, c, base, stem, n;
+    while(i<u.length){
+      c=u[i]; base=null;
+      if(u.substr(i,3)==='\u0915\u094D\u0937'){base='\u0915\u094D\u0937'; stem='ksh'; i+=3}
+      else if(u.substr(i,3)==='\u091C\u094D\u091E'){base='\u091C\u094D\u091E'; stem='gy'; i+=3}
+      else if(STEM[c]){base=c; stem=STEM[c]; i++}
+      if(base){
+        n=u[i];
+        if(n==='\u094D'){
+          if(u[i+1]==='\u200D'){
+            if(base!=='\u0930') return null;
+            units.push({u:base+'\u094D\u200D',r:'rr'}); i+=2;
+          } else {units.push({u:base+'\u094D',r:stem}); i++}
+        } else if(n&&SIGN[n]){units.push({u:base+n,r:stem+SIGN[n]}); i++}
+        else units.push({u:base,r:stem+'a',inh:true});
+        continue;
+      }
+      if(VOW[c]){units.push({u:c,r:VOW[c]}); i++; continue}
+      if(MARK[c]){units.push({u:c,r:MARK[c]}); i++; continue}
+      return null;                                   // something the Roman typing cannot produce
+    }
+    for(i=0;i<units.length-1;i++){                   // half consonant + \u0930\u093F  ->  "<stem>ri^"  (\u092A\u094D\u0930\u093F = pri^)
+      if(units[i].u.slice(-1)==='\u094D'&&units[i].r!=='rr'&&units[i+1].u==='\u0930\u093F')
+        units.splice(i,2,{u:units[i].u+'\u0930\u093F',r:units[i].r+'ri^'});
+    }
+    return units;
+  }
+  function nonSmart(r){return NepaliUnicode.toNepali(r,{smart:false}).replace(/ $/,'').split(':').join('\u0903')}
+  // Join the pieces; add "/" only where two neighbours would otherwise be read as one letter (k+ha = kha).
+  function buildRoman(units){
+    var rom='', uni='', k, r, t;
+    for(k=0;k<units.length;k++){
+      r=units[k].r; t=rom+r;
+      if(nonSmart(t)!==uni+units[k].u){
+        t=rom+'/'+r;
+        if(nonSmart(t)!==uni+units[k].u) return null;
+      }
+      rom=t; uni+=units[k].u;
+    }
+    return rom;
+  }
+  function romanCandidates(units){
+    var full=buildRoman(units); if(full===null||full==='') return [];
+    var c=[full];
+    if(smart.checked){
+      if(units[units.length-1].inh) c.push(full.slice(0,-1));   // Smart mode adds the final "a" itself: ghara -> ghar
+      c.push('['+full+']');                                       // last resort: smart mode switched off for this word
+    }
+    return c;
+  }
+  function roundTrip(cand,kantWord){
+    var uni=NepaliUnicode.toNepali(cand,{smart:smart.checked}).trim();
+    return uni!==''&&!/\s/.test(uni)&&Kantipur.convert(uni)===kantWord;
+  }
+  function romanFor(e,w){
+    if(!e||e.ti<0||e.base===null) return null;
+    var toks=inTokens(inp.value), tk=toks[e.ti];
+    if(!tk||tk.s!==e.typed) return null;                          // typed text changed since the popup was built
+    var uni=Kantipur.reverse(w);
+    if(!uni||Kantipur.convert(uni)!==w) return null;
+    var units=parseUnits(uni); if(!units) return null;
+    var c=romanCandidates(units);
+    for(var i=0;i<c.length;i++) if(roundTrip(c[i],w)) return {rom:c[i],at:tk};
+    return null;
+  }
+  function applyRoman(rr){
+    var tk=rr.at, R=rr.rom;
+    fixedRoman.add(R);
+    inp.focus(); inp.setSelectionRange(tk.i,tk.i+tk.s.length);
+    var ok=false; try{ok=document.execCommand('insertText',false,R)}catch(x){}   // keeps Ctrl+Z working
+    if(!ok||inp.value.substr(tk.i,R.length)!==R) inp.value=inp.value.slice(0,tk.i)+R+inp.value.slice(tk.i+tk.s.length);
+    var end=tk.i+R.length; inp.setSelectionRange(end,end);
+    convert();
+  }
+
+  // ---- suggestion popup (click any word; hover only works on underlined words) ----
+  // The textarea keeps all its normal behaviour (selecting, double-click...). To know which
+  // word is under the pointer, the page measures where each underline sits.
+  var tip=$('tip'), tipHead=$('tiphead'), tipList=$('tiplist'), tipNote=$('tipnote'), tipUndo=$('tipundo');
+  var hoverMark=null, hoverT=0, hideT=0, pinned=false, raf=0, pt=null;
+
+  function fontCheck(){
+    return (document.fonts&&document.fonts.load)?document.fonts.load('20px KantipurWeb','abc').then(function(f){
+      return f.length>0&&f.every(function(x){return x.status==='loaded'});
+    },function(){return false}):Promise.resolve(false);
+  }
+  function copyText(text,ok,fail){
+    function fb(){
+      var t=document.createElement('textarea'); t.value=text; t.style.cssText='position:fixed;opacity:0';
+      document.body.appendChild(t); t.select();
+      var done=false; try{done=document.execCommand('copy')}catch(e){}
+      document.body.removeChild(t); (done?ok:fail)();
+    }
+    if(navigator.clipboard&&window.isSecureContext) navigator.clipboard.writeText(text).then(ok,fb); else fb();
+  }
+  function wordAt(x,y){
+    var n=wordEls.length; if(!n) return null;
+    var lo=0, hi=n-1;                         // words are in reading order: binary search by line
+    while(lo<hi){
+      var mid=(lo+hi)>>1, r0=wordEls[mid].getClientRects()[0];
+      if(r0&&r0.bottom<y-2) lo=mid+1; else hi=mid;
+    }
+    for(var i=Math.max(0,lo-2);i<n;i++){
+      var rs=wordEls[i].getClientRects();
+      if(rs[0]&&rs[0].top>y+3) break;
+      for(var j=0;j<rs.length;j++){
+        var r=rs[j];
+        if(x>=r.left-1&&x<=r.right+1&&y>=r.top-3&&y<=r.bottom+3) return wordEls[i];
+      }
+    }
+    return null;
+  }
+  function closeTip(){clearTimeout(hoverT);clearTimeout(hideT);tip.hidden=true;pinned=false}
+  function scheduleHide(){clearTimeout(hideT);hideT=setTimeout(closeTip,250)}
+  function placeTip(m){
+    var r=m.getClientRects()[0]; if(!r){closeTip();return}
+    var w=tip.offsetWidth, h=tip.offsetHeight, vw=document.documentElement.clientWidth, vh=window.innerHeight;
+    var left=Math.max(8,Math.min(r.left,vw-w-8)), top=r.bottom+6;
+    if(top+h>vh-8&&r.top-h-6>8) top=r.top-h-6;
+    tip.style.left=left+'px'; tip.style.top=top+'px';
+  }
+  function openTip(m,pin){
+    if(!pin&&pinned&&!tip.hidden) return;     // hovering never replaces a popup the user clicked open
+    clearTimeout(hideT);
+    var e=wordKeys[+m.getAttribute('data-i')], miss=e.miss, can=e.base!==null;
+    var list=miss?suggest(e.k):related(e.k);
+    tipList.textContent=''; tipUndo.textContent='';
+    list.forEach(function(w){
+      var b=document.createElement('button'); b.type='button'; b.textContent=w; b.disabled=!can;
+      // Pick a word: first try to write it back into the typed text as Roman (yellow underline);
+      // if that is not possible, replace it in the Nepali output only (red underline on the typed word).
+      b.addEventListener('click',function(){
+        var rr=romanFor(e,w);
+        closeTip();
+        if(rr){applyRoman(rr); say('Word replaced · Roman text updated')}
+        else{overrides.set(e.base+e.ri,w); convert(); say('Word replaced')}
+      });
+      tipList.appendChild(b);
+    });
+    if(e.state==='fixed'&&can){
+      var u=document.createElement('button'); u.type='button'; u.className='ghost'; u.textContent='Undo replacement';
+      u.addEventListener('click',function(){overrides.delete(e.base+e.ri); closeTip(); convert(); say('Replacement undone')});
+      tipUndo.appendChild(u);
+    }
+    tipHead.textContent=e.state==='fixed'
+      ?(list.length?'Replaced. Other words (click one to replace it again):':'Replaced. No other close words were found.')
+      :miss
+      ?(list.length?'Not in the dictionary. Closest words (click one to replace this word):':'Not in the dictionary, and no close match was found.')
+      :(list.length?'In the dictionary. Related words (click one to replace this word):':'In the dictionary. No related words were found.');
+    tipNote.textContent=can?'':'This word could not be matched to a typed word, so it cannot be replaced.';
+    tip.hidden=false; pinned=!!pin;
+    placeTip(m);
+    if(list.length) fontCheck().then(function(ok){
+      if(!ok&&!tip.hidden){tipNote.textContent='"Kantipur Regular.ttf" was not found, so these words appear as encoded text.';placeTip(m)}
+    });
+  }
+  function onMove(){
+    raf=0;
+    var m=pt?wordAt(pt[0],pt[1]):null;
+    if(m&&m.tagName!=='MARK') m=null;         // hover is reserved for underlined words
+    var cur=m?'pointer':'';
+    if(out.style.cursor!==cur) out.style.cursor=cur;
+    if(m){
+      clearTimeout(hideT);
+      if(m!==hoverMark){hoverMark=m;clearTimeout(hoverT);hoverT=setTimeout(function(){openTip(m,false)},250)}
+    } else {
+      hoverMark=null; clearTimeout(hoverT);
+      if(!pinned&&!tip.hidden) scheduleHide();
+    }
+  }
+  out.addEventListener('mousemove',function(e){pt=[e.clientX,e.clientY]; if(!raf) raf=requestAnimationFrame(onMove)});
+  out.addEventListener('mouseleave',function(){hoverMark=null;clearTimeout(hoverT);if(!pinned&&!tip.hidden) scheduleHide()});
+  out.addEventListener('click',function(e){
+    clearTimeout(hoverT);
+    if(out.selectionStart!==out.selectionEnd) return;   // the user is selecting text, not asking for a popup
+    var m=wordAt(e.clientX,e.clientY); if(m) openTip(m,true);   // click works on every word
+  });
+  tip.addEventListener('mouseenter',function(){clearTimeout(hideT)});
+  tip.addEventListener('mouseleave',function(){if(!pinned) scheduleHide()});
+  document.addEventListener('mousedown',function(e){if(!tip.hidden&&!tip.contains(e.target)) closeTip()});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape') closeTip()});
+  window.addEventListener('scroll',function(e){if(e.target!==tip) closeTip()},true);
+
+  function countText(){var n=inp.value.length; return n?n+' character'+(n===1?'':'s'):''}
+  function convert(){
+    var src=inp.value;
+    // the converter appends one space after every word; drop the last one so output mirrors input
+    var uni=src?NepaliUnicode.toNepali(src,{smart:smart.checked}).replace(/ $/,''):'';
+    var r=kant.checked?renderKant(src,uni):{text:uni,entries:[],miss:0};
+    out.value=r.text;
+    paintSpell(r);
+    paintInput(src,r.toks,r.marked,r.yellow);
+    status.textContent=countText();
+  }
+
+  // Kantipur output is legacy-encoded text: it only reads as Nepali in the Kantipur font.
+  function setFont(){
+    var on=kant.checked;
+    spell.disabled=!on; $('spellopt').classList.toggle('off',!on);   // CheckSpell needs Kantipur
+    if(!on) spell.checked=false;
+    out.setAttribute('data-font',on?'kantipur':'unicode');
+    mirror.setAttribute('data-font',on?'kantipur':'unicode');
+    out.placeholder=on?kantPlaceholder:plain;
+    warn.textContent='';
+    if(on){
+      var ok=fontCheck();
+      ok.then(function(loaded){
+        if(!loaded&&kant.checked) warn.textContent='Could not load "Kantipur Regular.ttf". It must be in the same folder as this page, with the same file name and capitalisation.';
+      });
+    }
+    convert();
+  }
+  kant.addEventListener('change',setFont);
+
+  inp.addEventListener('input',convert);
+  // Roman words written by a picked suggestion were checked against the current Smart setting, so forget them when it changes.
+  smart.addEventListener('change',function(){fixedRoman.clear(); convert();});
+
+  $('clear').addEventListener('click',function(){
+    if(inp.value.length>=30 && !confirm('Clear everything you typed?')) return;
+    inp.value=''; overrides.clear(); fixedRoman.clear(); convert(); inp.focus();
+  });
+
+  var flash;
+  function say(msg){status.textContent=msg;clearTimeout(flash);flash=setTimeout(function(){status.textContent=countText()},1600)}
+  $('copy').addEventListener('click',function(){
+    if(!out.value){say('Nothing to copy yet');return}
+    copyText(out.value,function(){say('Copied')},function(){out.focus();out.select();say('Press Ctrl+C to copy')});
+  });
+
+  // Typing guide. Every Devanagari result is produced by the converter itself,
+  // so what the guide shows is exactly what typing it will give.
+  var guide=[
+    {h:'Letters where upper and lower case differ',
+     p:'Capitals give the harder sounds. For every other letter, case makes no difference.',
+     items:['ta','Ta','tha','Tha','da','Da','dha','Dha','na','Na','sha','Sha']},
+    {h:'Special characters',
+     items:[['pri^','ri^ : ra sign, as in \u092A\u094D\u0930\u093F'],['garrya','rr : as in \u0917\u0930\u094D\u200D\u092F'],
+            ['rri'],['rree'],['yna'],['chha'],['kshetra','ksha'],['gyaan','gya'],
+            ['sa*bidhaan','* : anusvara'],['maa**','** : chandrabindu'],['om']]},
+    {h:'Keep English words',
+     p:'Put any English text inside curly braces { } and it stays as typed.',
+     items:[['yo {mobile} mero ho']]},
+    {h:'Separate letters with a slash',
+     p:'If a letter joins the one before it by mistake, put / between them. The slash is not shown.',
+     items:[['pratishatko'],['pratishat/ko'],['sagarmaathaa'],['sagar/maathaa']]},
+    {h:'Keep the final halant',
+     p:'Smart mode drops the halant at the end of a word. Add a backslash \\ to keep it.',
+     items:[['bas'],['bas\\']]},
+    {h:'Example words',
+     items:['namaskaar','dhanyawaad','sa*vidhaan','sa\\watantrataa','sa/mjh/naa','chamatkaar','kaaThamaaDau*','nepaali yunikoD','mero desh Nepal ho']}
+  ];
+  var root=$('guide');
+  function add(text){
+    inp.value+=(inp.value&&!/\s$/.test(inp.value)?' ':'')+text; convert(); inp.focus();
+  }
+  guide.forEach(function(g){
+    var h=document.createElement('h3'); h.textContent=g.h; root.appendChild(h);
+    if(g.p){var p=document.createElement('p'); p.textContent=g.p; root.appendChild(p)}
+    var grid=document.createElement('div'); grid.className='ref';
+    g.items.forEach(function(it){
+      var roman=typeof it==='string'?it:it[0], note=typeof it==='string'?'':(it[1]||'');
+      var b=document.createElement('button'); b.type='button';
+      var left=document.createElement('span');
+      var r=document.createElement('span'); r.className='r'; r.textContent=roman; left.appendChild(r);
+      if(note){var n=document.createElement('span'); n.className='n'; n.textContent=note; left.appendChild(n)}
+      var d=document.createElement('span'); d.className='d';
+      d.textContent=NepaliUnicode.toNepali(roman,{smart:true}).trim();
+      b.appendChild(left); b.appendChild(d);
+      b.addEventListener('click',function(){add(roman)});
+      grid.appendChild(b);
+    });
+    root.appendChild(grid);
+  });
+  setFont();
+  if(spell.checked) autoLoad();
+})();
+</script>
+</body>
+</html>
