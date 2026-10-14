@@ -38,6 +38,7 @@ h1{font-size:20px;margin:0 0 14px}
 #tiplist{display:flex;flex-wrap:wrap;gap:6px}
 #tiplist button{font:24px/1.3 "KantipurWeb",monospace;font-weight:400;padding:3px 10px;background:var(--out-bg);color:var(--ink);border:1px solid var(--line)}
 #tiplist button:hover{border-color:var(--brand)}
+#tipadd{display:block;width:100%;margin-top:10px;padding:7px 10px;font-size:13px;text-align:left}
 #tipnote{font-size:12px;color:var(--accent);margin-top:8px}
 #tipnote:empty{display:none}
 .spell{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-top:10px;font-size:14px;color:var(--muted)}
@@ -75,23 +76,34 @@ a.btn:hover{filter:brightness(1.08)}
       <button id="dictbtn" type="button" class="ghost">Load eligible.txt…</button>
       <input id="dictfile" type="file" accept=".txt,text/plain" hidden>
     </div>
+    <div class="spell">
+      <span id="userinfo" role="status"></span>
+      <button id="uexport" type="button" class="ghost">Export my words</button>
+      <button id="uimport" type="button" class="ghost">Import my words…</button>
+      <button id="uclear" type="button" class="ghost">Remove my words</button>
+      <input id="ufile" type="file" accept=".txt,text/plain" hidden>
+    </div>
 
     <nav class="footnav"><a class="btn" href="index.htm">NEPALI UNICODE CONVERTER</a></nav>
   </main>
 </div>
 
 <div id="tip" role="dialog" aria-label="Suggested words" hidden>
-  <div id="tiphead"></div><div id="tiplist"></div><div id="tipnote"></div>
+  <div id="tiphead"></div><div id="tiplist"></div>
+  <button id="tipadd" type="button" class="ghost">＋ Add to dictionary</button>
+  <div id="tipnote"></div>
 </div>
 
 <script>
 (function(){
   var $=function(id){return document.getElementById(id)};
-  var txt=$('txt'), mirror=$('mirror'), status=$('status'), info=$('info'), warn=$('fontwarn');
+  var txt=$('txt'), mirror=$('mirror'), status=$('status'), info=$('info'), warn=$('fontwarn'), userinfo=$('userinfo');
 
   // eligible.txt holds Kantipur-encoded words, one per line (same file as the converter page).
   // Every word in the pasted text is looked up in that list exactly as typed.
+  // Words the user adds live in userSet (saved in this browser) and are merged into dict.
   var dict=null, dictFrom='', dictState='idle', missCount=0, wordCount=0, entries=[], wordEls=[];
+  var userSet=new Set();
   // Sentence punctuation that may be attached to a word. Other symbols are letters or vowel signs in Kantipur.
   var PUNCT='.,=-_‘’';
 
@@ -106,11 +118,11 @@ a.btn:hover{filter:brightness(1.08)}
   }
   function parseDict(text){
     var set=new Set(), lines=text.split(/\r?\n/);
-    for(var i=0;i<lines.length;i++){var l=lines[i].trim(); if(l) set.add(l)}
+    for(var i=0;i<lines.length;i++){var l=lines[i].trim(); if(l) set.add(l.replace(/^\uFEFF/,''))}
     return set;
   }
 
-  // Saved copy of the word list. IndexedDB, because a list this size will not fit in localStorage.
+  // Saved copies (word list and the user's own words). IndexedDB, because a list this size will not fit in localStorage.
   function kv(mode,fn){
     return new Promise(function(res,rej){
       if(typeof indexedDB==='undefined') return rej(new Error('no indexedDB'));
@@ -126,12 +138,28 @@ a.btn:hover{filter:brightness(1.08)}
   }
   function saveDict(text){return kv('readwrite',function(s){return s.put(text,'eligible')}).catch(function(){})}
   function loadSaved(){return kv('readonly',function(s){return s.get('eligible')}).catch(function(){return null})}
+  function saveUser(){
+    var text=Array.from(userSet).join('\n');
+    return kv('readwrite',function(s){return s.put(text,'userwords')}).catch(function(){
+      say('Could not save your words in this browser');
+    });
+  }
+  function loadUser(){return kv('readonly',function(s){return s.get('userwords')}).catch(function(){return null})}
+
+  // Put one word into the live dictionary and the suggestion index.
+  function addToLive(w){
+    if(!dict||dict.has(w)) return;
+    dict.add(w);
+    if(byLen){var a=byLen.get(w.length); if(!a) byLen.set(w.length,a=[]); a.push(w)}
+  }
+  function mergeUser(){ userSet.forEach(addToLive); sugCache=new Map(); }
 
   function useDict(text,from,save){
     var set=parseDict(text);
     if(!set.size){dictState='empty';paint();return false}
     dict=set; dictFrom=from; dictState='ready';
     buildIndex(set);
+    mergeUser();
     if(save) saveDict(text);
     paint(); return true;
   }
@@ -157,6 +185,38 @@ a.btn:hover{filter:brightness(1.08)}
       if(!useDict(decode(buf),f.name,true)) info.textContent='That file has no words in it.';
     });
     e.target.value='';
+  });
+
+  // ---- the user's own words ----
+  function addUserWord(w){
+    if(!w) return;
+    userSet.add(w); addToLive(w); sugCache=new Map();
+    saveUser(); paint(); say('Added to dictionary');
+  }
+  $('uexport').addEventListener('click',function(){
+    if(!userSet.size){say('You have not added any words yet');return}
+    var blob=new Blob([Array.from(userSet).join('\r\n')+'\r\n'],{type:'text/plain;charset=utf-8'});
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='my-words.txt';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){URL.revokeObjectURL(a.href)},2000);
+  });
+  $('uimport').addEventListener('click',function(){$('ufile').click()});
+  $('ufile').addEventListener('change',function(e){
+    var f=e.target.files[0]; if(!f) return;
+    f.arrayBuffer().then(function(buf){
+      var set=parseDict(decode(buf)), n=0;
+      set.forEach(function(w){ if(!userSet.has(w)){userSet.add(w);n++} });
+      mergeUser(); saveUser(); paint(); say(n+' word'+(n===1?'':'s')+' imported');
+    });
+    e.target.value='';
+  });
+  $('uclear').addEventListener('click',function(){
+    if(!userSet.size){say('You have not added any words yet');return}
+    if(!confirm('Remove all '+userSet.size+' words you added? Export them first if you want to keep a copy.')) return;
+    userSet=new Set(); saveUser();
+    // rebuild from the saved eligible.txt copy so the removed words are no longer accepted
+    dict=null; dictState='idle'; byLen=null; sugCache=new Map();
+    autoLoad(); say('Your words were removed');
   });
 
   // ---- suggestions (closest dictionary words) ----
@@ -242,10 +302,11 @@ a.btn:hover{filter:brightness(1.08)}
     } else mirror.textContent='';
     if(!wordEls.length) txt.style.cursor='';
     info.textContent=
-      dictState==='ready'?'Dictionary: '+dict.size.toLocaleString()+' words ('+dictFrom+') · '+missCount.toLocaleString()+' not found'+(missCount?'. Click or hover an underlined word to pick a replacement.':''):
+      dictState==='ready'?'Dictionary: '+dict.size.toLocaleString()+' words ('+dictFrom+(userSet.size?' + your words':'')+') · '+missCount.toLocaleString()+' not found'+(missCount?'. Click or hover an underlined word to pick a replacement or add it.':''):
       dictState==='loading'?'Loading eligible.txt…':
       dictState==='empty'?'eligible.txt has no words in it.':
       dictState==='failed'?'Could not open eligible.txt automatically (browsers block this for pages opened from disk). Choose the file once and it will be remembered.':'';
+    userinfo.textContent='Your added words (saved in this browser): '+userSet.size.toLocaleString();
     status.textContent=wordCount?wordCount.toLocaleString()+' word'+(wordCount===1?'':'s'):'';
     syncMirror();
   }
@@ -256,8 +317,8 @@ a.btn:hover{filter:brightness(1.08)}
   // ---- suggestion popup ----
   // The textarea keeps all its normal behaviour (typing, selecting...). To know which
   // underlined word is under the pointer, the page measures where each underline sits.
-  var tip=$('tip'), tipHead=$('tiphead'), tipList=$('tiplist'), tipNote=$('tipnote');
-  var hoverMark=null, hoverT=0, hideT=0, pinned=false, raf=0, pt=null;
+  var tip=$('tip'), tipHead=$('tiphead'), tipList=$('tiplist'), tipNote=$('tipnote'), tipAdd=$('tipadd');
+  var hoverMark=null, hoverT=0, hideT=0, pinned=false, raf=0, pt=null, curEntry=null;
 
   function fontCheck(){
     return (document.fonts&&document.fonts.load)?document.fonts.load('20px KantipurWeb','abc').then(function(f){
@@ -310,10 +371,15 @@ a.btn:hover{filter:brightness(1.08)}
     txt.scrollTop=top; syncMirror();
     say('Word replaced');
   }
+  tipAdd.addEventListener('click',function(){
+    var e=curEntry; closeTip();
+    if(e) addUserWord(e.k);
+  });
   function openTip(m,pin){
     if(!pin&&pinned&&!tip.hidden) return;     // hovering never replaces a popup the user clicked open
     clearTimeout(hideT);
     var e=entries[+m.getAttribute('data-i')], list=suggest(e.k);
+    curEntry=e;
     tipList.textContent='';
     list.forEach(function(w){
       var b=document.createElement('button'); b.type='button'; b.textContent=w;
@@ -371,7 +437,11 @@ a.btn:hover{filter:brightness(1.08)}
   });
 
   paint();
-  autoLoad();   // CheckSpell is always on here
+  // Load the user's saved words first so they are merged the moment the dictionary arrives.
+  loadUser().then(function(saved){
+    if(saved){ parseDict(saved).forEach(function(w){userSet.add(w)}); }
+    if(dict){ mergeUser(); paint(); }
+  }).then(autoLoad);   // CheckSpell is always on here
 })();
 </script>
 </body>
