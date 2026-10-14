@@ -43,12 +43,20 @@ h1{font-size:20px;margin:0 0 14px}
 #tipnote:empty{display:none}
 .spell{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-top:10px;font-size:14px;color:var(--muted)}
 .spell button{padding:5px 12px;font-size:13px}
-textarea:focus,button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(--focus);outline-offset:1px}
+textarea:focus,button:focus-visible,a:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--focus);outline-offset:1px}
 .bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-top:14px}
 button{font:600 14px var(--latin);padding:9px 16px;border-radius:6px;border:1px solid var(--brand);background:var(--brand);color:var(--brand-ink);cursor:pointer}
 button.ghost{background:transparent;color:var(--brand)}
 button:hover{filter:brightness(1.08)}
 .stat{margin-left:auto;font-size:13px;color:var(--muted)}
+details.sync{margin-top:10px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 14px;font-size:14px}
+details.sync summary{cursor:pointer;font-weight:600;color:var(--muted)}
+.cfg{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 14px;margin-top:12px}
+.cfg label{display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--muted)}
+.cfg input{font:15px var(--latin);padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.cfgbtns{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.help{margin:12px 0 0;font-size:13px;color:var(--muted)}
+.help ol{margin:6px 0 0;padding-left:20px}
 .footnav{display:flex;justify-content:center;margin-top:28px}
 a.btn{display:inline-block;font:600 14px var(--latin);padding:10px 20px;border-radius:6px;border:1px solid var(--brand);background:var(--brand);color:var(--brand-ink);text-decoration:none}
 a.btn:hover{filter:brightness(1.08)}
@@ -78,11 +86,36 @@ a.btn:hover{filter:brightness(1.08)}
     </div>
     <div class="spell">
       <span id="userinfo" role="status"></span>
+      <button id="usync" type="button" class="ghost">Sync now</button>
       <button id="uexport" type="button" class="ghost">Export my words</button>
-      <button id="uimport" type="button" class="ghost">Import my words…</button>
-      <button id="uclear" type="button" class="ghost">Remove my words</button>
+      <button id="uimport" type="button" class="ghost">Import words…</button>
       <input id="ufile" type="file" accept=".txt,text/plain" hidden>
     </div>
+
+    <details class="sync" id="syncbox">
+      <summary>Sync settings (GitHub)</summary>
+      <div class="cfg">
+        <label>GitHub user or organisation<input id="c_owner" autocomplete="off" spellcheck="false"></label>
+        <label>Repository name<input id="c_repo" autocomplete="off" spellcheck="false"></label>
+        <label>Branch<input id="c_branch" autocomplete="off" spellcheck="false" placeholder="main"></label>
+        <label>Word file in the repo<input id="c_path" autocomplete="off" spellcheck="false" placeholder="user-words.txt"></label>
+        <label>Access token (kept only in this browser)<input id="c_token" type="password" autocomplete="off" spellcheck="false" placeholder="github_pat_…"></label>
+      </div>
+      <div class="cfgbtns">
+        <button id="csave" type="button">Save &amp; connect</button>
+        <button id="cdisc" type="button" class="ghost">Disconnect this device</button>
+      </div>
+      <div class="help">
+        Do this once on each device:
+        <ol>
+          <li>On GitHub open Settings → Developer settings → Personal access tokens → <b>Fine-grained tokens</b> → Generate new token.</li>
+          <li>Under "Repository access" choose <b>Only select repositories</b> and pick just this repo.</li>
+          <li>Under "Permissions → Repository permissions" set <b>Contents</b> to <b>Read and write</b>. Nothing else is needed.</li>
+          <li>Paste the token above and press Save &amp; connect. The words are stored in the file named above (it is created on the first added word).</li>
+        </ol>
+        Devices without a token can still read the shared words but cannot add new ones to the repo.
+      </div>
+    </details>
 
     <nav class="footnav"><a class="btn" href="index.htm">NEPALI UNICODE CONVERTER</a></nav>
   </main>
@@ -101,9 +134,10 @@ a.btn:hover{filter:brightness(1.08)}
 
   // eligible.txt holds Kantipur-encoded words, one per line (same file as the converter page).
   // Every word in the pasted text is looked up in that list exactly as typed.
-  // Words the user adds live in userSet (saved in this browser) and are merged into dict.
+  // Words the user adds are kept in userSet and synced to a text file in the GitHub repo.
   var dict=null, dictFrom='', dictState='idle', missCount=0, wordCount=0, entries=[], wordEls=[];
-  var userSet=new Set();
+  var userSet=new Set();      // all extra words (remote file + not-yet-uploaded ones)
+  var pending=new Set();      // words added on this device that are not in the repo file yet
   // Sentence punctuation that may be attached to a word. Other symbols are letters or vowel signs in Kantipur.
   var PUNCT='.,=-_‘’';
 
@@ -118,11 +152,11 @@ a.btn:hover{filter:brightness(1.08)}
   }
   function parseDict(text){
     var set=new Set(), lines=text.split(/\r?\n/);
-    for(var i=0;i<lines.length;i++){var l=lines[i].trim(); if(l) set.add(l.replace(/^\uFEFF/,''))}
+    for(var i=0;i<lines.length;i++){var l=lines[i].replace(/^\uFEFF/,'').trim(); if(l) set.add(l)}
     return set;
   }
 
-  // Saved copies (word list and the user's own words). IndexedDB, because a list this size will not fit in localStorage.
+  // Saved copies. IndexedDB, because the word list will not fit in localStorage.
   function kv(mode,fn){
     return new Promise(function(res,rej){
       if(typeof indexedDB==='undefined') return rej(new Error('no indexedDB'));
@@ -131,20 +165,29 @@ a.btn:hover{filter:brightness(1.08)}
       o.onerror=function(){rej(o.error)};
       o.onsuccess=function(){
         var db=o.result, tx=db.transaction('kv',mode), q=fn(tx.objectStore('kv'));
-        tx.oncomplete=function(){db.close();res(q.result)};
+        tx.oncomplete=function(){db.close();res(q&&q.result)};
         tx.onerror=tx.onabort=function(){db.close();rej(tx.error)};
       };
     });
   }
   function saveDict(text){return kv('readwrite',function(s){return s.put(text,'eligible')}).catch(function(){})}
   function loadSaved(){return kv('readonly',function(s){return s.get('eligible')}).catch(function(){return null})}
-  function saveUser(){
-    var text=Array.from(userSet).join('\n');
-    return kv('readwrite',function(s){return s.put(text,'userwords')}).catch(function(){
-      say('Could not save your words in this browser');
+  // Local copy of the user's words, so they work offline and nothing is lost before it is uploaded.
+  function saveLocal(){
+    return kv('readwrite',function(s){
+      s.put(Array.from(userSet).join('\n'),'userwords');
+      return s.put(Array.from(pending).join('\n'),'pendingwords');
+    }).catch(function(){});
+  }
+  function loadLocal(){
+    return Promise.all([
+      kv('readonly',function(s){return s.get('userwords')}).catch(function(){return null}),
+      kv('readonly',function(s){return s.get('pendingwords')}).catch(function(){return null})
+    ]).then(function(r){
+      if(r[0]) parseDict(r[0]).forEach(function(w){userSet.add(w)});
+      if(r[1]) parseDict(r[1]).forEach(function(w){pending.add(w);userSet.add(w)});
     });
   }
-  function loadUser(){return kv('readonly',function(s){return s.get('userwords')}).catch(function(){return null})}
 
   // Put one word into the live dictionary and the suggestion index.
   function addToLive(w){
@@ -187,14 +230,135 @@ a.btn:hover{filter:brightness(1.08)}
     e.target.value='';
   });
 
-  // ---- the user's own words ----
+  // ---- GitHub sync of the user's words ----
+  var cfg={owner:'',repo:'',branch:'main',path:'user-words.txt',token:''};
+  var syncMsg='', syncing=false, syncAgain=false, retries=0, pushT=0, lastSync=0;
+
+  function loadCfg(){
+    try{var s=localStorage.getItem('kpGh'); if(s){var o=JSON.parse(s); for(var k in o) if(k in cfg&&typeof o[k]==='string') cfg[k]=o[k]}}catch(e){}
+    if(!cfg.owner){      // guess from the address when the page is served by GitHub Pages
+      var h=location.hostname;
+      if(/\.github\.io$/i.test(h)){
+        cfg.owner=h.split('.')[0];
+        var seg=location.pathname.split('/')[1];
+        cfg.repo=(seg&&!/\.html?$/i.test(seg))?seg:h;
+      }
+    }
+  }
+  function saveCfg(){return (function(){try{localStorage.setItem('kpGh',JSON.stringify(cfg));return true}catch(e){return false}})()}
+  function hasToken(){return !!(cfg.token&&cfg.owner&&cfg.repo)}
+  function renderUser(){
+    userinfo.textContent='Your added words: '+userSet.size.toLocaleString()+(syncMsg?' · '+syncMsg:'');
+  }
+  function setSync(msg){syncMsg=msg;renderUser()}
+
+  function b64enc(s){
+    var u=new TextEncoder().encode(s), bin='', i;
+    for(i=0;i<u.length;i+=8192) bin+=String.fromCharCode.apply(null,u.subarray(i,i+8192));
+    return btoa(bin);
+  }
+  function b64dec(s){
+    var bin=atob(s.replace(/\s/g,'')), u=new Uint8Array(bin.length), i;
+    for(i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
+    return new TextDecoder('utf-8').decode(u);
+  }
+  function apiUrl(){
+    return 'https://api.github.com/repos/'+encodeURIComponent(cfg.owner)+'/'+encodeURIComponent(cfg.repo)+
+      '/contents/'+cfg.path.split('/').map(encodeURIComponent).join('/');
+  }
+  function api(method,body){
+    var url=apiUrl();
+    if(method==='GET') url+='?ref='+encodeURIComponent(cfg.branch)+'&_='+Date.now();
+    return fetch(url,{method:method,cache:'no-store',
+      headers:{'Authorization':'Bearer '+cfg.token,'Accept':'application/vnd.github+json'},
+      body:body?JSON.stringify(body):undefined});
+  }
+  function httpErr(r){
+    var m=r.status===401?'GitHub rejected the token (401)':
+          r.status===403?'The token cannot write to this repo, or GitHub is rate limiting (403)':
+          r.status===404?'Repo, branch or token access not found (404). Check the sync settings':
+          'GitHub error '+r.status;
+    return new Error(m);
+  }
+  // Read the word file from the repo (with sha, needed for the update).
+  function getRemote(){
+    return api('GET').then(function(r){
+      if(r.status===404) return {sha:null,words:new Set()};
+      if(!r.ok) throw httpErr(r);
+      return r.json().then(function(j){
+        if(Array.isArray(j)||j.type!=='file') throw new Error('"'+cfg.path+'" is not a file');
+        if(j.encoding!=='base64'||j.content===undefined) throw new Error('Word file is too large to read through the API');
+        return {sha:j.sha,words:parseDict(b64dec(j.content))};
+      });
+    });
+  }
+  function applyUser(set){
+    var before=userSet.size, grew=false;
+    set.forEach(function(w){if(!userSet.has(w)) grew=true});
+    userSet=set;
+    mergeUser();
+    if(grew||userSet.size!==before) { if(dict) paint(); }
+    renderUser();
+  }
+  // Without a token: just read the shared file published next to the page.
+  function readPublic(){
+    if(typeof fetch!=='function') return Promise.resolve();
+    return fetch('user-words.txt',{cache:'no-cache'}).then(function(r){
+      if(!r.ok) throw new Error('none'); return r.arrayBuffer();
+    }).then(function(buf){
+      var set=parseDict(decode(buf)); pending.forEach(function(w){set.add(w)});
+      applyUser(set); saveLocal();
+      setSync(pending.size?'saved on this device only. Connect GitHub (Sync settings) to share':'read-only on this device (no GitHub token)');
+    }).catch(function(){
+      setSync(pending.size?'saved on this device only. Connect GitHub (Sync settings) to share':'not connected to GitHub (see Sync settings)');
+    });
+  }
+  function sync(){
+    if(!hasToken()) return readPublic();
+    if(syncing){syncAgain=true;return Promise.resolve()}
+    syncing=true; setSync('syncing…');
+    var pushed=new Set(pending);
+    return getRemote().then(function(r){
+      var merged=new Set(r.words), need=false;
+      pending.forEach(function(w){merged.add(w); if(!r.words.has(w)) need=true});
+      applyUser(merged);
+      if(!need){pushed.forEach(function(w){pending.delete(w)}); saveLocal(); return}
+      var body={message:'Add '+pushed.size+' word'+(pushed.size===1?'':'s')+' to user dictionary',
+                content:b64enc(Array.from(merged).join('\n')+'\n'), branch:cfg.branch};
+      if(r.sha) body.sha=r.sha;
+      return api('PUT',body).then(function(resp){
+        if(resp.status===409||resp.status===422){   // the file changed meanwhile: read it again and retry
+          if(++retries<=3) syncAgain=true; else throw new Error('The word file keeps changing, try again');
+          return;
+        }
+        if(!resp.ok) throw httpErr(resp);
+        pushed.forEach(function(w){pending.delete(w)}); saveLocal();
+      });
+    }).then(function(){
+      if(!syncAgain){retries=0; lastSync=Date.now(); setSync(pending.size?'waiting to sync':'synced '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}))}
+    },function(err){
+      setSync('not synced: '+(err&&err.message?err.message:'network error')+(pending.size?' (words are kept on this device)':''));
+    }).then(function(){
+      syncing=false;
+      if(syncAgain){syncAgain=false; return sync()}
+    });
+  }
+  function scheduleSync(){
+    clearTimeout(pushT);
+    if(!hasToken()){setSync('saved on this device only. Connect GitHub (Sync settings) to share');return}
+    setSync('will sync in a moment…');
+    pushT=setTimeout(sync,1500);
+  }
+
   function addUserWord(w){
     if(!w) return;
-    userSet.add(w); addToLive(w); sugCache=new Map();
-    saveUser(); paint(); say('Added to dictionary');
+    userSet.add(w); pending.add(w); addToLive(w); sugCache=new Map();
+    saveLocal(); paint(); say('Added to dictionary'); scheduleSync();
   }
+
+  $('usync').addEventListener('click',function(){retries=0;sync()});
   $('uexport').addEventListener('click',function(){
-    if(!userSet.size){say('You have not added any words yet');return}
+    if(!userSet.size){say('No added words yet');return}
     var blob=new Blob([Array.from(userSet).join('\r\n')+'\r\n'],{type:'text/plain;charset=utf-8'});
     var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='my-words.txt';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
@@ -205,18 +369,32 @@ a.btn:hover{filter:brightness(1.08)}
     var f=e.target.files[0]; if(!f) return;
     f.arrayBuffer().then(function(buf){
       var set=parseDict(decode(buf)), n=0;
-      set.forEach(function(w){ if(!userSet.has(w)){userSet.add(w);n++} });
-      mergeUser(); saveUser(); paint(); say(n+' word'+(n===1?'':'s')+' imported');
+      set.forEach(function(w){ if(!userSet.has(w)){userSet.add(w);pending.add(w);n++} });
+      mergeUser(); saveLocal(); paint(); say(n+' word'+(n===1?'':'s')+' imported');
+      if(n) scheduleSync();
     });
     e.target.value='';
   });
-  $('uclear').addEventListener('click',function(){
-    if(!userSet.size){say('You have not added any words yet');return}
-    if(!confirm('Remove all '+userSet.size+' words you added? Export them first if you want to keep a copy.')) return;
-    userSet=new Set(); saveUser();
-    // rebuild from the saved eligible.txt copy so the removed words are no longer accepted
-    dict=null; dictState='idle'; byLen=null; sugCache=new Map();
-    autoLoad(); say('Your words were removed');
+
+  // settings form
+  function fillCfg(){
+    $('c_owner').value=cfg.owner; $('c_repo').value=cfg.repo; $('c_branch').value=cfg.branch;
+    $('c_path').value=cfg.path; $('c_token').value=cfg.token;
+  }
+  $('csave').addEventListener('click',function(){
+    cfg.owner=$('c_owner').value.trim(); cfg.repo=$('c_repo').value.trim();
+    cfg.branch=$('c_branch').value.trim()||'main';
+    cfg.path=($('c_path').value.trim()||'user-words.txt').replace(/^\/+/,'');
+    cfg.token=$('c_token').value.trim();
+    if(!saveCfg()) setSync('could not store the settings in this browser (private mode?)');
+    retries=0; sync();
+  });
+  $('cdisc').addEventListener('click',function(){
+    cfg.token=''; $('c_token').value=''; saveCfg();
+    setSync(pending.size?'saved on this device only. Connect GitHub (Sync settings) to share':'disconnected');
+  });
+  document.addEventListener('visibilitychange',function(){
+    if(document.visibilityState==='visible'&&!syncing&&Date.now()-lastSync>30000) sync();
   });
 
   // ---- suggestions (closest dictionary words) ----
@@ -302,11 +480,11 @@ a.btn:hover{filter:brightness(1.08)}
     } else mirror.textContent='';
     if(!wordEls.length) txt.style.cursor='';
     info.textContent=
-      dictState==='ready'?'Dictionary: '+dict.size.toLocaleString()+' words ('+dictFrom+(userSet.size?' + your words':'')+') · '+missCount.toLocaleString()+' not found'+(missCount?'. Click or hover an underlined word to pick a replacement or add it.':''):
+      dictState==='ready'?'Dictionary: '+dict.size.toLocaleString()+' words ('+dictFrom+(userSet.size?' + your added words':'')+') · '+missCount.toLocaleString()+' not found'+(missCount?'. Click or hover an underlined word to pick a replacement or add it.':''):
       dictState==='loading'?'Loading eligible.txt…':
       dictState==='empty'?'eligible.txt has no words in it.':
       dictState==='failed'?'Could not open eligible.txt automatically (browsers block this for pages opened from disk). Choose the file once and it will be remembered.':'';
-    userinfo.textContent='Your added words (saved in this browser): '+userSet.size.toLocaleString();
+    renderUser();
     status.textContent=wordCount?wordCount.toLocaleString()+' word'+(wordCount===1?'':'s'):'';
     syncMirror();
   }
@@ -436,12 +614,14 @@ a.btn:hover{filter:brightness(1.08)}
     if(!loaded) warn.textContent='Could not load "Kantipur Regular.ttf". It must be in the same folder as this page, with the same file name and capitalisation.';
   });
 
+  loadCfg(); fillCfg();
   paint();
-  // Load the user's saved words first so they are merged the moment the dictionary arrives.
-  loadUser().then(function(saved){
-    if(saved){ parseDict(saved).forEach(function(w){userSet.add(w)}); }
-    if(dict){ mergeUser(); paint(); }
-  }).then(autoLoad);   // CheckSpell is always on here
+  // Saved words first, so they are merged the moment the dictionary arrives; then load the dictionary and sync.
+  loadLocal().then(function(){
+    mergeUser(); paint();
+    autoLoad();
+    return sync();
+  });
 })();
 </script>
 </body>
