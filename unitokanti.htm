@@ -52,10 +52,13 @@
     src:url("Kantipur%20Regular.ttf") format("truetype");
     font-display:swap;
   }
-  #output[data-font="current"]{font-family:Preeti,"Preeti Normal",monospace}
+  @font-face{
+    font-family:"PreetiWeb";
+    src:url("Preeti%20Normal.otf") format("opentype");
+    font-display:swap;
+  }
+  #output[data-font="preeti"]{font-family:"PreetiWeb","Preeti Normal","Preeti",monospace}
   #output[data-font="kantipur"]{font-family:"KantipurWeb",monospace}
-  /* in "current look" the placeholder stays plain English; in Kantipur mode it is converted Nepali and uses the Kantipur font */
-  #output[data-font="current"]::placeholder{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
   .seg label{padding:6px 12px;font-size:.85rem;cursor:pointer;color:var(--text);user-select:none}
   .seg input{display:none}
@@ -106,10 +109,10 @@
 
     <div class="card">
       <div class="head">
-        <h2>Preeti</h2>
+        <h2>Output</h2>
         <div class="seg" role="radiogroup" aria-label="Preview font">
-          <label title="Uses the Preeti font if it is installed on your computer"><input type="radio" name="pf" value="current" checked><span>Current look</span></label>
-          <label title="Uses Kantipur Regular.ttf from this website"><input type="radio" name="pf" value="kantipur"><span>Kantipur font</span></label>
+          <label title="Uses Preeti Normal.otf, bundled with this page"><input type="radio" name="pf" value="preeti" checked><span>Preeti font</span></label>
+          <label title="Uses Kantipur Regular.ttf, bundled with this page"><input type="radio" name="pf" value="kantipur"><span>Kantipur font</span></label>
         </div>
         <div class="sizebtns" aria-label="Preview font size">
           <button id="smaller" type="button" title="Decrease font size">A&minus;</button>
@@ -117,7 +120,7 @@
           <button id="bigger" type="button" title="Increase font size">A+</button>
         </div>
       </div>
-      <textarea id="output" data-font="current" readonly spellcheck="false" placeholder="Preeti text appears here"></textarea>
+      <textarea id="output" data-font="preeti" readonly spellcheck="false" placeholder="Converted text appears here"></textarea>
       <div class="fontwarn" id="fontwarn"></div>
       <div class="row">
         <button id="copy" class="primary" type="button">Copy</button>
@@ -365,7 +368,7 @@ function schedule(){ clearTimeout(timer); timer = setTimeout(run, 200); }
 
 inputEl.addEventListener("input", schedule);
 
-// ---- highlight the matching Unicode word when text is selected in the Preeti box ----
+// ---- highlight the matching Unicode word when text is selected in the output box ----
 const backdrop = $("backdrop");
 const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 function clearHL(){ backdrop.innerHTML = ""; }
@@ -410,23 +413,27 @@ $("smaller").addEventListener("click", () => { if (outSize > 10){ outSize -= 2; 
 $("bigger").addEventListener("click", () => { if (outSize < 72){ outSize += 2; applySize(); } });
 applySize();
 
-// ---- preview font switch: "current" (installed Preeti) or bundled Kantipur ----
-async function kantipurLoaded(){
+// ---- preview font switch: bundled "Preeti Normal.otf" or bundled "Kantipur Regular.ttf" ----
+const FONT_INFO = {
+  preeti:   { family: "PreetiWeb",   file: "Preeti Normal.otf" },
+  kantipur: { family: "KantipurWeb", file: "Kantipur Regular.ttf" }
+};
+async function fontLoaded(cssFamily){
   try{
-    const faces = await document.fonts.load('20px KantipurWeb', 'abc');
+    const faces = await document.fonts.load('20px "' + cssFamily + '"', 'abc');
     return faces.length > 0 && faces.every(f => f.status === "loaded");
   }catch(err){ return false; }
 }
-const ENGLISH_PLACEHOLDER = outputEl.placeholder;
-// Nepali placeholder, converted with the same code as the main text so Kantipur draws it as Nepali
-const KANTIPUR_PLACEHOLDER = preprocess("यहाँ प्रिटी टेक्स्ट देखिनेछ").split(" ").map(convertWord).join(" ");
+// Nepali placeholder, converted with the same code as the main text so either font draws it as Nepali
+const PREVIEW_PLACEHOLDER = preprocess("यहाँ प्रिटी वा कान्तिपुर टेक्स्ट देखिनेछ").split(" ").map(convertWord).join(" ");
 async function setFont(mode, save){
   outputEl.setAttribute("data-font", mode);
-  outputEl.placeholder = mode === "kantipur" ? KANTIPUR_PLACEHOLDER : ENGLISH_PLACEHOLDER;
+  outputEl.placeholder = PREVIEW_PLACEHOLDER;
   const warn = $("fontwarn");
   warn.textContent = "";
-  if (mode === "kantipur" && !(await kantipurLoaded())){
-    warn.textContent = "Could not load \"Kantipur Regular.ttf\". It must be in the same folder as this page (same file name, same capitalisation).";
+  const info = FONT_INFO[mode];
+  if (!(await fontLoaded(info.family))){
+    warn.textContent = 'Could not load "' + info.file + '". It must be in the same folder as this page (same file name, same capitalisation).';
   }
   if (save){ try{ localStorage.setItem("previewFont", mode); }catch(err){} }
 }
@@ -436,10 +443,9 @@ document.querySelectorAll('input[name="pf"]').forEach(r => {
 (function(){
   let m = null;
   try{ m = localStorage.getItem("previewFont"); }catch(err){}
-  if (m === "kantipur"){
-    document.querySelector('input[name="pf"][value="kantipur"]').checked = true;
-    setFont("kantipur", false);
-  }
+  const mode = (m === "kantipur") ? "kantipur" : "preeti";
+  document.querySelector('input[name="pf"][value="' + mode + '"]').checked = true;
+  setFont(mode, false);
 })();
 
 $("clear").addEventListener("click", () => { inputEl.value = ""; fileName = "preeti"; run(); inputEl.focus(); });
