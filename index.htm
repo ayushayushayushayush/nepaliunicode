@@ -692,9 +692,9 @@ function reverse(k){
   var kantPlaceholder=Kantipur.placeholder('\u0928\u092E\u0938\u094D\u0924\u0947, \u092E\u0947\u0930\u094B \u0928\u093E\u092E \u0930\u093E\u092E \u0939\u094B \u0964');
 
   // ---- spell check -------------------------------------------------------
-  // eligible.txt holds Kantipur-encoded words, one per line. Every Devanagari
-  // word is converted with the same Kantipur logic and looked up in that list,
-  // CheckSpell is only available while Kantipur is switched on.
+  // eligible1.txt, eligible2.txt, ... hold Kantipur-encoded words, one per line. They are merged
+  // into one list. Every Devanagari word is converted with the same Kantipur logic and looked up
+  // in that list. CheckSpell is only available while Kantipur is switched on.
   var dict=null, dictFrom='', dictState='idle', missCount=0, wordKeys=[], wordEls=[];
   var RUNSPLIT=/([\u0900-\u0963\u0971-\u097F\u200C\u200D]+)/, LETTER=/[\u0904-\u0939\u0958-\u095F]/;
 
@@ -736,15 +736,22 @@ function reverse(k){
     if(save) saveDict(text);
     convert(); return true;
   }
+
+  // Files loaded automatically and merged into one dictionary. Add more names here later.
+  var DICT_FILES=['eligible1.txt','eligible2.txt'];
+
   function autoLoad(){
     if(dict||dictState==='loading') return;
     dictState='loading'; convert();
-    var req=(typeof fetch==='function')?fetch('eligible.txt',{cache:'no-cache'}).then(function(r){
-      if(!r.ok) throw new Error('http '+r.status); return r.arrayBuffer();
+    var req=(typeof fetch==='function')?Promise.all(DICT_FILES.map(function(name){
+      return fetch(name,{cache:'no-cache'}).then(function(r){
+        if(!r.ok) throw new Error('http '+r.status+' '+name);
+        return r.arrayBuffer();
+      }).then(decode);
+    })).then(function(texts){
+      if(!useDict(texts.join('\n'),DICT_FILES.join(' + '),true)) throw new Error('empty');
     }):Promise.reject(new Error('no fetch'));
-    req.then(function(buf){
-      if(!useDict(decode(buf),'eligible.txt',true)) throw new Error('empty');
-    }).catch(function(){
+    req.catch(function(){
       // Browsers usually refuse to read files next to a page opened from disk (file://).
       return loadSaved().then(function(saved){
         if(!(saved&&useDict(saved,'saved copy',false))){dictState='failed';convert();}
